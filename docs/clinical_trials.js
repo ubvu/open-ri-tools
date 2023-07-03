@@ -15,7 +15,7 @@ async function startApplication() {
   self.pyodide.globals.set("sendPatch", sendPatch);
   console.log("Loaded!");
   await self.pyodide.loadPackage("micropip");
-  const env_spec = ['markdown-it-py<3', 'https://cdn.holoviz.org/panel/1.1.1/dist/wheels/bokeh-3.1.1-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.1.1/dist/wheels/panel-1.1.1-py3-none-any.whl', 'pyodide-http==0.2.1', 'requests']
+  const env_spec = ['markdown-it-py<3', 'https://cdn.holoviz.org/panel/1.1.1/dist/wheels/bokeh-3.1.1-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.1.1/dist/wheels/panel-1.1.1-py3-none-any.whl', 'pyodide-http==0.2.1', 'pandas', 'plotly', 'requests']
   for (const pkg of env_spec) {
     let pkg_name;
     if (pkg.endsWith('.whl')) {
@@ -50,19 +50,20 @@ init_doc()
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import panel as pn
-pn.extension()
+pn.extension('plotly')
 
 import requests
+import pandas as pd
 
 
-# In[ ]:
+# In[2]:
 
 
-def get_citing_pmids(doi):
+def get_citing(doi):
     
     base_url_works = 'https://api.openalex.org/works'
     
@@ -76,24 +77,31 @@ def get_citing_pmids(doi):
     # obtain citing documents/pmids
     params = {'filter': f'cites:{work_id}',
               'cursor': '*', 'per-page': 100}
-    pmids = set()
+    records = []
     done = False
     while not done:
         r = requests.get(base_url_works, params)
         data = r.json()
         for work in data['results']:
-            pmid = work['ids'].get('pmid')
-            if pmid:
-                pmids.add(pmid.replace('https://pubmed.ncbi.nlm.nih.gov/', ''))
+            record = {
+                'title': work.get('title'),
+                'year': work.get('publication_year'),
+                'doi': work.get('doi'),
+                'pmid': work['ids'].get('pmid')
+            }
+            #pmid = work['ids'].get('pmid')
+            #if pmid:
+            #    pmids.add(pmid.replace('https://pubmed.ncbi.nlm.nih.gov/', ''))
+            records.append(record)
         if data['meta']['next_cursor']:
             params['cursor'] = data['meta']['next_cursor']
         else:
             done = True
     
-    return list(pmids)
+    return pd.DataFrame(records)
 
 
-# In[ ]:
+# In[3]:
 
 
 def get_clinical_trials(pmids):
@@ -112,54 +120,115 @@ def get_clinical_trials(pmids):
     return data['idlist']
 
 
-# In[ ]:
+# In[4]:
 
 
-def get_metric(doi):
-    pmids = get_citing_pmids(doi)
-    pmids_t =  get_clinical_trials(pmids)
-    return round(len(pmids_t)/len(pmids)*100,2)  
+#def get_metric(doi):
+#    pmids = get_citing_pmids(doi)
+#    pmids_t =  get_clinical_trials(pmids)
+#    return round(len(pmids_t)/len(pmids)*100,2)  
 
 
-# In[ ]:
+# In[5]:
 
 
-# Test
-#doi = '10.1136/annrheumdis-2019-216655'  # this article is cited by at least 1 clinical trial
-#get_metric(doi)
+def get_data(doi):
+    df = get_citing(doi)
+    df['pmid'] = df.pmid.apply(lambda x: 
+                               x.replace('https://pubmed.ncbi.nlm.nih.gov/', '')
+                               if not pd.isna(x) else x)
+    pmids = df.pmid.dropna().to_list()
+    pmids_trial = get_clinical_trials(pmids)
+    df['is_trial'] = df.pmid.isin(pmids_trial)
+    return df
 
 
-# In[ ]:
+# In[6]:
+
+
+# test
+#test_doi = '10.1136/annrheumdis-2019-216655'
+#test_df = get_data(test_doi)
+
+
+# In[7]:
+
+
+# mock df
+# df = 
+
+
+# In[8]:
+
+
+import plotly.express as px
+
+
+# In[9]:
 
 
 output_status = pn.pane.Str('')
-output_ratio = pn.indicators.Number(name='Ratio', value=0, format='{value}%')
+#output_ratio = pn.indicators.Number(name='Ratio', value=0, format='{value}%')
 input_doi = pn.widgets.TextInput(placeholder='Enter DOI here...')
+
+# citations over the years
+citation_years = pn.pane.Plotly()
+
+# pie chart ratio trials (from pubmed records)
+#trials_pie =
+
+# publications table
+trials_table = pn.pane.DataFrame(pd.DataFrame(), index=False, render_links=True,
+                                sizing_mode="stretch_both")
+
+
+# In[10]:
+
 
 def callback(target, event):
     target.object = 'Search in progress...'
-    ratio = get_metric(event.new.strip())
-    output_ratio.value = ratio
+    df = get_data(event.new.strip())
+
+    fig = px.line(df.groupby(['year', 'is_trial'], as_index=False).title.count(), 
+                  x="year", y="title", color='is_trial',
+                  labels={'title': 'Citations', 'year': 'Year'})
+    citation_years.object = fig
+    # df[~pd.isna(df.pmid)]
+    
+    trials_table.object = df[df.is_trial==True].drop(columns=['pmid', 'is_trial'])
     target.object = 'Done'
     
 input_doi.link(output_status, callbacks={'value': callback});
 
 
-# In[ ]:
+# In[11]:
 
 
 template = pn.template.BootstrapTemplate(
     title='Is my research used in clinical trials?'
 )
 template.main.append(
-    pn.Column(
-        input_doi,
-        output_status,
-        output_ratio
+    pn.Row(
+        pn.Column(
+            input_doi,
+            output_status,
+            citation_years
+        ),
+        pn.Column(
+            pn.pane.Markdown('## Clinical Trials:'),
+            #trials_pie,
+            trials_table
+        )
     )
 )
 
 template.servable();  # ; to prevent inline output / use preview instead
+
+
+# In[ ]:
+
+
+
 
 
 
