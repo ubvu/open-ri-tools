@@ -50,58 +50,60 @@ init_doc()
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import panel as pn
-pn.extension('plotly')
-
-import requests
 import pandas as pd
+import requests
+
+pn.extension('plotly', 'tabulator')
 
 
-# In[2]:
+# ## Functions
+
+# In[ ]:
 
 
 def get_citing(doi):
     
     base_url_works = 'https://api.openalex.org/works'
+    df = pd.DataFrame()
     
     # get work id
     params = {'filter': f'doi:{doi}'}
     r = requests.get(base_url_works, params)
-    data = r.json()
-    work_id = data['results'][0]['id']  # if multiple, take first
-    work_id = work_id.replace('https://openalex.org/', '')
-    
-    # obtain citing documents/pmids
-    params = {'filter': f'cites:{work_id}',
-              'cursor': '*', 'per-page': 100}
-    records = []
-    done = False
-    while not done:
-        r = requests.get(base_url_works, params)
+    if r.status_code == 200:
         data = r.json()
-        for work in data['results']:
-            record = {
-                'title': work.get('title'),
-                'year': work.get('publication_year'),
-                'doi': work.get('doi'),
-                'pmid': work['ids'].get('pmid')
-            }
-            #pmid = work['ids'].get('pmid')
-            #if pmid:
-            #    pmids.add(pmid.replace('https://pubmed.ncbi.nlm.nih.gov/', ''))
-            records.append(record)
-        if data['meta']['next_cursor']:
-            params['cursor'] = data['meta']['next_cursor']
-        else:
-            done = True
-    
-    return pd.DataFrame(records)
+        if len(data['results']) > 0:
+            work_id = data['results'][0]['id']  # if multiple, take first
+            work_id = work_id.replace('https://openalex.org/', '')
+            
+            # obtain citing documents/pmids
+            params = {'filter': f'cites:{work_id}',
+                      'cursor': '*', 'per-page': 100}
+            records = []
+            done = False
+            while not done:
+                r = requests.get(base_url_works, params)
+                data = r.json()
+                for work in data['results']:
+                    record = {
+                        'title': work.get('title'),
+                        'year': work.get('publication_year'),
+                        'doi': work.get('doi'),
+                        'pmid': work['ids'].get('pmid')
+                    }
+                    records.append(record)
+                if data['meta']['next_cursor']:
+                    params['cursor'] = data['meta']['next_cursor']
+                else:
+                    done = True
+    df = pd.DataFrame(records)        
+    return df
 
 
-# In[3]:
+# In[ ]:
 
 
 def get_clinical_trials(pmids):
@@ -120,88 +122,155 @@ def get_clinical_trials(pmids):
     return data['idlist']
 
 
-# In[4]:
-
-
-#def get_metric(doi):
-#    pmids = get_citing_pmids(doi)
-#    pmids_t =  get_clinical_trials(pmids)
-#    return round(len(pmids_t)/len(pmids)*100,2)  
-
-
-# In[5]:
+# In[ ]:
 
 
 def get_data(doi):
     df = get_citing(doi)
-    df['pmid'] = df.pmid.apply(lambda x: 
-                               x.replace('https://pubmed.ncbi.nlm.nih.gov/', '')
-                               if not pd.isna(x) else x)
-    pmids = df.pmid.dropna().to_list()
-    pmids_trial = get_clinical_trials(pmids)
-    df['is_trial'] = df.pmid.isin(pmids_trial)
+    if not df.empty:
+        df['pmid'] = df.pmid.apply(lambda x: 
+                                   x.replace('https://pubmed.ncbi.nlm.nih.gov/', '')
+                                   if not pd.isna(x) else x)
+        pmids = df.pmid.dropna().to_list()
+        pmids_trial = get_clinical_trials(pmids)
+        df['is_trial'] = df.pmid.isin(pmids_trial)
     return df
 
 
-# In[6]:
+# In[ ]:
 
 
-# test
-#test_doi = '10.1136/annrheumdis-2019-216655'
-#test_df = get_data(test_doi)
+# create df to load when application starts; store in repo and fetch from url
+#df = get_data('10.1136/annrheumdis-2019-216655')
+#df.to_csv('../data/clinical_trials_default.csv')
 
 
-# In[7]:
+# ## Load (default) data
+
+# In[ ]:
 
 
-# mock df
-# df = 
+df = pd.read_csv('https://raw.githubusercontent.com/ubvu/open-ri-tools/main/data/clinical_trials_default.csv', index_col=0)
 
 
-# In[8]:
+# ## Plots
+
+# In[ ]:
 
 
 import plotly.express as px
 
 
-# In[9]:
+# In[ ]:
 
 
-output_status = pn.pane.Str('')
-#output_ratio = pn.indicators.Number(name='Ratio', value=0, format='{value}%')
-input_doi = pn.widgets.TextInput(placeholder='Enter DOI here...')
+def plot_citations(df):
+    agg = df.groupby(['year', 'is_trial'], as_index=False).title.count()
+    fig = px.bar(agg, x="year", y="title", color='is_trial',
+                 labels={'title': 'Citations', 'year': 'Year'},
+                 template="simple_white")
+    return fig
 
-# citations over the years
-citation_years = pn.pane.Plotly()
+
+# ## Components
+
+# In[ ]:
+
+
+# Text boxes
+text_box_doi = pn.widgets.TextInput(placeholder='Enter DOI here...')
+text_box_status = pn.pane.Str('')
+
+# Citation plot
+pane_plot_citations = pn.pane.Plotly(plot_citations(df), config={"responsive": False})
 
 # pie chart ratio trials (from pubmed records)
 #trials_pie =
 
 # publications table
-trials_table = pn.pane.DataFrame(pd.DataFrame(), index=False, render_links=True,
-                                sizing_mode="stretch_both")
+#trials_table = pn.pane.DataFrame(df, index=False, render_links=True, sizing_mode="stretch_both")
+formatters = {
+    'doi': {'type': 'link', 'label': 'open', 'target': "_blank"},
+    'pmid': {'type': 'link', 'urlPrefix': 'https://pubmed.ncbi.nlm.nih.gov/', 'label': 'open', 'target': "_blank"},
+    'is_trial': {'type': 'tickCross'},
+    'year': {'type': 'int'}
+}
+widget_table = pn.widgets.Tabulator(df, formatters=formatters, sizing_mode="stretch_both",
+                                    widths={'index': '5%', 'title': '30%', 'year': '20%', 'doi': '15%', 'pmid': '15%', 'is_trial': '15'})
 
 
-# In[10]:
+# In[ ]:
 
 
+# test
+#pane_plot_citations.servable()
+
+
+# In[ ]:
+
+
+# test
+#widget_table = pn.widgets.Tabulator(df[['doi', 'pmid']], formatters=formatters)
+#widget_table.servable()
+
+
+# ## Interactivity
+
+# In[ ]:
+
+
+# # plotly click_data does not work at this point:
+# # https://github.com/holoviz/panel/issues/5096
+# @pn.depends(citation_years.param.click_data, watch=True)
+# def trials_table(event, df=df):
+#     try:
+#         year = round(event["points"][0]["x"],0)
+#     except:
+#         year = 2021
+#     dff = df[df.year==year]
+#     return pn.pane.DataFrame(dff, index=False, render_links=True, sizing_mode="stretch_both")
+
+
+# In[ ]:
+
+
+# table filter
+cb_trial = pn.widgets.Checkbox(name='show clinical trials')
+#slider_year = pn.widgets.IntSlider(name='year')
+# TODO slider has to be linked (.bind) to the df
+
+widget_table.add_filter(cb_trial, 'is_trial')
+#widget_table.add_filter(slider_year, 'year')
+
+
+# In[ ]:
+
+
+# test
+#pn.Column(cb_trial, widget_table).servable()
+
+
+# In[ ]:
+
+
+# Entering a DOI
 def callback(target, event):
     target.object = 'Search in progress...'
     df = get_data(event.new.strip())
-
-    fig = px.line(df.groupby(['year', 'is_trial'], as_index=False).title.count(), 
-                  x="year", y="title", color='is_trial',
-                  labels={'title': 'Citations', 'year': 'Year'})
-    citation_years.object = fig
-    # df[~pd.isna(df.pmid)]
-    
-    trials_table.object = df[df.is_trial==True].drop(columns=['pmid', 'is_trial'])
-    target.object = 'Done'
-    
-input_doi.link(output_status, callbacks={'value': callback});
+    if df.empty:
+        target.object = 'Invalid DOI or no data available'  
+    else:
+        pane_plot_citations.object = plot_citations(df)
+        # df[~pd.isna(df.pmid)]
+        widget_table.value = df 
+        target.object = 'Done'
+        
+text_box_doi.link(text_box_status, callbacks={'value': callback});
 
 
-# In[11]:
+# ## Layout
+
+# In[ ]:
 
 
 template = pn.template.BootstrapTemplate(
@@ -210,14 +279,15 @@ template = pn.template.BootstrapTemplate(
 template.main.append(
     pn.Row(
         pn.Column(
-            input_doi,
-            output_status,
-            citation_years
+            text_box_doi,
+            text_box_status,
+            pane_plot_citations
         ),
         pn.Column(
-            pn.pane.Markdown('## Clinical Trials:'),
+            #pn.pane.Markdown('## Clinical Trials:'),
             #trials_pie,
-            trials_table
+            cb_trial,
+            widget_table
         )
     )
 )
