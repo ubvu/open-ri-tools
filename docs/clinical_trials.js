@@ -50,38 +50,43 @@ init_doc()
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
+# Panel infers Pyodide installs from these imports
 import panel as pn
 import pandas as pd
 import requests
 
+# necessary to render in notebook
 pn.extension('plotly', 'tabulator')
 
 
-# ## Functions
+# ## Backend
+# 
+# - Functions for data collection and transformation
 
-# In[ ]:
+# In[2]:
 
 
+# retrieve citing publications from openalex
 def get_citing(doi):
     
     base_url_works = 'https://api.openalex.org/works'
-    df = pd.DataFrame()
+    df = pd.DataFrame()  # return empty df when encountering issues
     
-    # get work id
+    # get work id from doi
     params = {'filter': f'doi:{doi}'}
     r = requests.get(base_url_works, params)
     if r.status_code == 200:
         data = r.json()
         if len(data['results']) > 0:
-            work_id = data['results'][0]['id']  # if multiple, take first
+            work_id = data['results'][0]['id']  # if multiple, take first; TODO: we can use this to retrieve data for multiple dois
             work_id = work_id.replace('https://openalex.org/', '')
             
-            # obtain citing documents/pmids
+            # obtain citing publications/pmids
             params = {'filter': f'cites:{work_id}',
-                      'cursor': '*', 'per-page': 100}
+                      'cursor': '*', 'per-page': 100}  # using cursor pagination
             records = []
             done = False
             while not done:
@@ -99,13 +104,14 @@ def get_citing(doi):
                     params['cursor'] = data['meta']['next_cursor']
                 else:
                     done = True
-    df = pd.DataFrame(records)        
+            df = pd.DataFrame(records)        
     return df
 
 
-# In[ ]:
+# In[3]:
 
 
+# retrieve clinical trials from pubmed (filter)
 def get_clinical_trials(pmids):
     
     search_url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
@@ -122,9 +128,10 @@ def get_clinical_trials(pmids):
     return data['idlist']
 
 
-# In[ ]:
+# In[4]:
 
 
+# main function: collect data and transform
 def get_data(doi):
     df = get_citing(doi)
     if not df.empty:
@@ -137,31 +144,32 @@ def get_data(doi):
     return df
 
 
-# In[ ]:
+# In[5]:
 
 
-# create df to load when application starts; store in repo and fetch from url
-#df = get_data('10.1136/annrheumdis-2019-216655')
+# when starting the application, we want to show a default dashboard using existing data
+# uncomment and run this cell to update the default data / push to repo
+#df = get_data('10.1136/annrheumdis-2019-216655')  # or: 10.3389/fnsys.2013.00031
 #df.to_csv('../data/clinical_trials_default.csv')
 
 
-# ## Load (default) data
+# ## Load default data
 
-# In[ ]:
-
-
-df = pd.read_csv('https://raw.githubusercontent.com/ubvu/open-ri-tools/main/data/clinical_trials_default.csv', index_col=0)
+# In[6]:
 
 
-# ## Plots
+df_demo = pd.read_csv('https://raw.githubusercontent.com/ubvu/open-ri-tools/main/data/clinical_trials_default.csv', index_col=0)
 
-# In[ ]:
+
+# ## Plotting functions
+
+# In[7]:
 
 
 import plotly.express as px
 
 
-# In[ ]:
+# In[8]:
 
 
 def plot_citations(df):
@@ -172,51 +180,96 @@ def plot_citations(df):
     return fig
 
 
-# ## Components
+# ## Components and Interactivity
+# 
+# - create components and bind them
 
-# In[ ]:
+# In[9]:
 
 
-# Text boxes
-text_box_doi = pn.widgets.TextInput(placeholder='Enter DOI here...')
-text_box_status = pn.pane.Str('')
+# main dataframe widget (not displayed), used to bind other components to
+# is updated when doi is submitted and processed successfully
+df_widget = pn.widgets.DataFrame(df_demo, name='df')
 
-# Citation plot
-pane_plot_citations = pn.pane.Plotly(plot_citations(df), config={"responsive": False})
 
-# pie chart ratio trials (from pubmed records)
-#trials_pie =
+# In[10]:
+
+
+# text boxes
+tb_doi = pn.widgets.TextInput(placeholder='Enter DOI here...')
+
+# citation plot
+citation_fig = pn.bind(plot_citations, df_widget)  # updated when df changes
+pane_plot_citations = pn.pane.Plotly(citation_fig, config={"responsive": False})
 
 # publications table
-#trials_table = pn.pane.DataFrame(df, index=False, render_links=True, sizing_mode="stretch_both")
 formatters = {
-    'doi': {'type': 'link', 'label': 'open', 'target': "_blank"},
-    'pmid': {'type': 'link', 'urlPrefix': 'https://pubmed.ncbi.nlm.nih.gov/', 'label': 'open', 'target': "_blank"},
+    'doi': {'type': 'link', 'label': '⇗', 'target': "_blank"},
+    'pmid': {'type': 'link', 'urlPrefix': 'https://pubmed.ncbi.nlm.nih.gov/', 'label': '⇗', 'target': "_blank"},
     'is_trial': {'type': 'tickCross'},
     'year': {'type': 'int'}
 }
-widget_table = pn.widgets.Tabulator(df, formatters=formatters, sizing_mode="stretch_both",
-                                    widths={'index': '5%', 'title': '30%', 'year': '20%', 'doi': '15%', 'pmid': '15%', 'is_trial': '15'})
+# fix title width (~40%), distribute rest equally
+cols = df_widget.value.columns; w_rest = 60/(len(cols)-1)
+widths = {c:f'{w_rest}%' if c != 'title' else f'{100-(w_rest*(len(cols)-1))}%' for c in df_widget.value.columns}
+widget_table = pn.widgets.Tabulator(df_widget,  # implicitly binds table to df
+                                    formatters=formatters, sizing_mode="stretch_both", show_index=False, widths=widths)
+# table filters
+# checkbox
+cb_trial = pn.widgets.Checkbox(name='show clinical trials')
+# slider
+# year range needs to be calculated first
+def year_range(df):
+    return {'start': int(df.year.min()), 'end': int(df.year.max())}
+# year range binds to df via refs argument
+slider_year = pn.widgets.IntRangeSlider(refs=pn.bind(year_range, df_widget), **year_range(df_widget.value))  # start/end defaults needed
+# add to table
+widget_table.add_filter(cb_trial, 'is_trial')
+widget_table.add_filter(slider_year, 'year')
 
 
-# In[ ]:
+# In[11]:
 
 
 # test
 #pane_plot_citations.servable()
 
 
-# In[ ]:
+# In[12]:
 
 
 # test
-#widget_table = pn.widgets.Tabulator(df[['doi', 'pmid']], formatters=formatters)
-#widget_table.servable()
+#pn.Row(cb_trial, slider_year, widget_table).servable()
 
 
-# ## Interactivity
+# In[13]:
 
-# In[ ]:
+
+# test: observe updates when df changes
+#df_widget.value = df_demo[df_demo.year==2020]
+
+
+# In[14]:
+
+
+# text/doi input triggers data update and yields current status (via generator)
+# note on generators: only yield, return breaks the execution
+def update_data(doi=None):
+    if not doi: 
+        yield ''  # show nothing when initializing
+    else:
+        yield 'Search in progress...'
+        df = get_data(doi)
+        if df.empty:
+            yield 'Invalid DOI or no data available'  
+        else:
+            df_widget.value = df  # triggers updates
+            yield 'Done'
+
+status_text = pn.bind(update_data, tb_doi)
+
+
+# In[15]:
 
 
 # # plotly click_data does not work at this point:
@@ -231,46 +284,11 @@ widget_table = pn.widgets.Tabulator(df, formatters=formatters, sizing_mode="stre
 #     return pn.pane.DataFrame(dff, index=False, render_links=True, sizing_mode="stretch_both")
 
 
-# In[ ]:
-
-
-# table filter
-cb_trial = pn.widgets.Checkbox(name='show clinical trials')
-#slider_year = pn.widgets.IntSlider(name='year')
-# TODO slider has to be linked (.bind) to the df
-
-widget_table.add_filter(cb_trial, 'is_trial')
-#widget_table.add_filter(slider_year, 'year')
-
-
-# In[ ]:
-
-
-# test
-#pn.Column(cb_trial, widget_table).servable()
-
-
-# In[ ]:
-
-
-# Entering a DOI
-def callback(target, event):
-    target.object = 'Search in progress...'
-    df = get_data(event.new.strip())
-    if df.empty:
-        target.object = 'Invalid DOI or no data available'  
-    else:
-        pane_plot_citations.object = plot_citations(df)
-        # df[~pd.isna(df.pmid)]
-        widget_table.value = df 
-        target.object = 'Done'
-        
-text_box_doi.link(text_box_status, callbacks={'value': callback});
-
-
 # ## Layout
+# 
+# - add components to page
 
-# In[ ]:
+# In[16]:
 
 
 template = pn.template.BootstrapTemplate(
@@ -279,19 +297,18 @@ template = pn.template.BootstrapTemplate(
 template.main.append(
     pn.Row(
         pn.Column(
-            text_box_doi,
-            text_box_status,
+            tb_doi,
+            status_text,
             pane_plot_citations
         ),
         pn.Column(
-            #pn.pane.Markdown('## Clinical Trials:'),
-            #trials_pie,
-            cb_trial,
+            pn.Row(cb_trial, slider_year),
             widget_table
         )
     )
 )
 
+# make page servable
 template.servable();  # ; to prevent inline output / use preview instead
 
 
