@@ -231,7 +231,9 @@ cb_trial = pn.widgets.Checkbox(name='show clinical trials')
 # slider
 # year range needs to be calculated first
 def year_range(df):
-    return {'start': int(df.year.min()), 'end': int(df.year.max())}
+    ymin = int(df.year.min())
+    ymax = int(df.year.max())
+    return {'start': ymin, 'end': ymax, 'value': (ymin, ymax)}  # label=value so it has to be set as well
 # year range binds to df via refs argument
 slider_year = pn.widgets.IntRangeSlider(refs=pn.bind(year_range, df_widget), **year_range(df_widget.value))  # start/end defaults needed
 # add to table
