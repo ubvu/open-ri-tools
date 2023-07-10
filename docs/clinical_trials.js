@@ -161,15 +161,25 @@ def get_data(doi):
 df_demo = pd.read_csv('https://raw.githubusercontent.com/ubvu/open-ri-tools/main/data/clinical_trials_default.csv', index_col=0)
 
 
+# In[7]:
+
+
+# transformations to the dataframe
+# applied when loading or updating data
+def transform_df(df):
+    #df = df.astype(object)
+    return df
+
+
 # ## Plotting functions
 
-# In[7]:
+# In[8]:
 
 
 import plotly.express as px
 
 
-# In[8]:
+# In[9]:
 
 
 def plot_citations(df):
@@ -177,6 +187,7 @@ def plot_citations(df):
     fig = px.bar(agg, x="year", y="title", color='is_trial',
                  labels={'title': 'Citations', 'year': 'Year'},
                  template="simple_white")
+    fig.update_xaxes(type='category')  # otherwise, ticks appear when zooming in
     return fig
 
 
@@ -184,15 +195,15 @@ def plot_citations(df):
 # 
 # - create components and bind them
 
-# In[9]:
+# In[10]:
 
 
 # main dataframe widget (not displayed), used to bind other components to
 # is updated when doi is submitted and processed successfully
-df_widget = pn.widgets.DataFrame(df_demo, name='df')
+df_widget = pn.widgets.DataFrame(transform_df(df_demo), name='df')
 
 
-# In[10]:
+# In[11]:
 
 
 # text boxes
@@ -228,28 +239,28 @@ widget_table.add_filter(cb_trial, 'is_trial')
 widget_table.add_filter(slider_year, 'year')
 
 
-# In[11]:
+# In[12]:
 
 
 # test
 #pane_plot_citations.servable()
 
 
-# In[12]:
+# In[13]:
 
 
 # test
 #pn.Row(cb_trial, slider_year, widget_table).servable()
 
 
-# In[13]:
+# In[14]:
 
 
 # test: observe updates when df changes
 #df_widget.value = df_demo[df_demo.year==2020]
 
 
-# In[14]:
+# In[15]:
 
 
 # text/doi input triggers data update and yields current status (via generator)
@@ -263,13 +274,13 @@ def update_data(doi=None):
         if df.empty:
             yield 'Invalid DOI or no data available'  
         else:
-            df_widget.value = df  # triggers updates
+            df_widget.value = transform_df(df)  # triggers updates
             yield 'Done'
 
 status_text = pn.bind(update_data, tb_doi)
 
 
-# In[15]:
+# In[16]:
 
 
 # # plotly click_data does not work at this point:
@@ -288,7 +299,7 @@ status_text = pn.bind(update_data, tb_doi)
 # 
 # - add components to page
 
-# In[16]:
+# In[17]:
 
 
 template = pn.template.BootstrapTemplate(
