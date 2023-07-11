@@ -1,0 +1,9 @@
+name: panel
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - plotly=5.15.0
+  - jupyterlab=4.0.2
+  - jupytext=1.14.7
+  - panel=1.1.1
