@@ -15,7 +15,7 @@
 # ---
 
 # %%
-# Panel infers Pyodide installs from these imports
+# Panel infers Pyodide installs from these imports:
 import panel as pn
 import pandas as pd
 import requests
