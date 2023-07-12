@@ -1,7 +1,7 @@
 # configuration file for jupytext
 
 # pair ipynb notebooks with py:percent files
-formats = "notebooks///ipynb,scripts///py:percent"
+formats = "notebooks///ipynb,scripts///md"
 
 # exclude metadata in scripts
 notebook_metadata_filter = "kernel"
