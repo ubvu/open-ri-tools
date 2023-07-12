@@ -21,6 +21,7 @@ jobs:
         run: |
           pip install notebook
           pip install panel
+          pip install plotly
           pip install jupytext
       - name: Convert
         run: |
