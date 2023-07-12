@@ -1,0 +1,6 @@
+name: panel-build
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - panel=1.1.1
