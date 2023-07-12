@@ -28,33 +28,35 @@ conda deactivate panel
 
 #### Notebooks
 
-All source code is written in a Jupyter notebook which makes it very easy and quick to test new features.
+All source code is written inside a Jupyter notebook which has two benefits:
+- code is enriched with markdown formatted text for better readability
+- notebooks make it very easy and quick to test new features
+
 A disadvantage of notebooks is that their rich metadata can make version control troublesome.
-For that reason, we use Jupytext which removes metadata from notebooks and stores them as .py files
-
-
-- /scripts contains plain text notebooks (metadata has been removed)
-- when opened as a notebook (in JupyterLab), Jupytext creates an .ipynb file under /notebooks
-- this notebook can be run and modified and when saved, the plain text notebook under /scripts is modified (and metadata stripped)
-- the notebooks themselves are gitignored
-
-Use the following command to create all notebooks from scripts at once:
+For that reason, we use **Jupytext** which removes metadata from notebooks and stores them as .md files
+- /scripts contains those .md files (when opened on github, they are rendered quite nicely)
+- use the following command to create all notebooks from .md files at once (they appear under /notebooks):
 ```
 jupytext --sync scripts/*
 ```
+- the notebooks can be run and modified and when saved, the .md file under /scripts is modified (and metadata stripped)
+- the notebooks themselves are gitignored
 
 ### Development in Jupyterlab
 
 I recommend using Panel Preview (note: some js behaviour doesn't work in preview).\
 Make sure to add `.servable()` to a template or panel so that it is rendered.
 
-### Convert application to static HTML (hosted on gh pages)
+### Convert application to static HTML
+
+The website itself is built on github using **actions**.
+To build the website locally for testing, follow these steps:
 
 [Instructions](https://panel.holoviz.org/how_to/wasm/convert.html)
 
 (you can use the bash script provided in this repo)
 ```bash
-panel convert notebooks/* --to pyodide-worker --out docs --index --watch
+panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index --watch
 ```
 **Converts all notebooks and places the files under _docs_**\
 --index: creates an index for better navigation\
