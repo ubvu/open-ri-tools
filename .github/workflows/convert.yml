@@ -24,7 +24,7 @@ jobs:
       - name: Convert
         run: |
           jupytext --sync scripts/*
-          panel convert notebooks/* --to pyodide-worker --out docs --index
+          panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index
       - name: Commit website
         run: |
           git config --global user.name 'Max Paulus'
