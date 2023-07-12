@@ -33,4 +33,4 @@ jobs:
           git config --global user.email 'paulmaxus@gmail.com'
           git add docs/*
           git commit -m "updated website"
-          git push origin gh-pages
+          git push -u origin gh-pages
