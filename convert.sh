@@ -1,1 +1,1 @@
-panel convert notebooks/* --to pyodide-worker --out docs --index --watch
+panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index --watch
