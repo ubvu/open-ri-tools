@@ -1,9 +1,11 @@
-name: panel
+name: ori
 channels:
   - conda-forge
   - defaults
 dependencies:
+  - jupyterlab<4.0.0
+  - nodejs=18.16.1
+  - panel=1.2.0
   - plotly=5.15.0
-  - jupyterlab=4.0.2
   - jupytext=1.14.7
-  - panel=1.1.1
+  - jupyterlab-git=0.41.0

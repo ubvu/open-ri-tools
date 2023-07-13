@@ -1,7 +1,0 @@
-name: panel-build
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - panel
-  - jupytext
