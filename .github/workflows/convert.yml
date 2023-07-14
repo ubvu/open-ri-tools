@@ -3,7 +3,10 @@ name: convert-to-website
 on:
   workflow_dispatch:
   push:
-    branches: main
+    branches: 
+      - main
+    paths:
+      - 'scripts'
 
 permissions:
   contents: write
@@ -19,10 +22,7 @@ jobs:
           python-version: '3.10'
       - name: Packages
         run: |
-          pip install notebook
-          pip install panel
-          pip install plotly
-          pip install jupytext
+          pip install notebook panel plotly jupytext
       - name: Convert
         run: |
           jupytext --sync scripts/*
