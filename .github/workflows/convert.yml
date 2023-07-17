@@ -26,7 +26,7 @@ jobs:
       - name: Convert
         run: |
           jupytext --sync scripts/*
-          panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index
+          panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index --title "Open RI" --pwa
       - name: Deploy
         uses: s0/git-publish-subdir-action@develop
         env:
