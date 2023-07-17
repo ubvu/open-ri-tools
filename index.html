@@ -4,7 +4,7 @@
   <!-- Basic Page Needs
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
   <meta charset="utf-8">
-  <title>Panel Applications</title>
+  <title>Open RI</title>
 
   <!-- Mobile Specific Metas
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
@@ -22,9 +22,14 @@
   –––––––––––––––––––––––––––––––––––––––––––––––––– -->
   <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.holoviz.org/panel/1.2.0/dist/images/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.holoviz.org/panel/1.2.0/dist/images/favicon.ico">
-  <link rel="manifest" href="https://panel.holoviz.org/_static/icons/site.webmanifest">
+  <link rel="manifest" href="site.webmanifest">
   <meta name="msapplication-TileColor" content="#da532c">
   <meta name="theme-color" content="#ffffff">
+  <script type="text/javascript">
+    if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./serviceWorker.js');
+  }
+  </script>
   <script type="module" src="https://cdn.holoviz.org/panel/1.2.0/dist/bundled/@microsoft/fast-components@2.30.6/dist/fast-components.js"></script>
   <script type="module" src="https://cdn.holoviz.org/panel/1.2.0/dist/bundled/fast/js/fast_design.js"></script>
   <script type="text/javascript">
@@ -119,7 +124,7 @@
 	cursor: pointer;
     }
     .header {
-	background-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0) ),url("https://cdn.holoviz.org/panel/1.2.0/dist/images/index_background.png");
+	background-image: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0) ),url("./images/index_background.png");
 	background-size: cover;
 	background-repeat: no-repeat;
 	background-position: center;
@@ -257,7 +262,7 @@
             <fast-anchor id="title" href="https://panel.holoviz.org" appearance="neutral" target="_self"><img id="panel-logo" src="https://panel.holoviz.org/_static/logo_horizontal.png"/></fast-anchor>
             <fast-tooltip anchor="title">Click to visit the Panel web site</fast-tooltip>
           </div>
-          <span id="subtitle">Panel Applications</span>
+          <span id="subtitle">Open RI</span>
         </div>
       </section>
     </fast-design-system-provider>
