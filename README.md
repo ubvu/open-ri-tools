@@ -1,7 +1,9 @@
 # Open RI tools: discover the impact of your research
 
-All apps are created with [Panel](https://panel.holoviz.org/).\
+All apps are created with [Panel](https://panel.holoviz.org/). 
 They are static websites running entirely in your browser by leveraging [Pyodide](https://pyodide.org/en/stable/).
+
+We use a technology called Progressive Web Apps which allows you to install each application on your computer, e.g. follow the instructions for [Chrome](https://support.google.com/chrome/answer/9658361).
 
 ## Contribution: development workflow
 
