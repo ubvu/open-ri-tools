@@ -16,13 +16,15 @@ jupyter:
 
 ```python
 import panel as pn
-pn.extension('tabulator')
 
 import requests
 import pandas as pd
-#from ipysigma import Sigmaa
 
 from pyalex import Works
+import hvplot.networkx as hvnx
+import networkx as nx
+
+pn.extension('tabulator')
 ```
 
 ## Backend
@@ -85,6 +87,33 @@ def coauthor_net(author_ids, depth=1, nodes=[], nodes_n=[], edges=[]):
     return nodes, edges
 ```
 
+## Create ipysigma widget
+
+```python
+# def network_widget(nodes, edges):
+#     g = tables_to_graph(
+#         nodes, 
+#         edges, 
+#         node_col="n", node_data=["entity"], 
+#         edge_data=["type"], 
+#         edge_source_col="n1",
+#         edge_target_col="n2",
+#         directed=False
+#     )
+#     return Sigma(g, node_color='entity', node_size=g.degree)
+```
+
+```python
+def network_widget(nodes, edges):
+    
+    if len(edges) > 0:
+        G = nx.from_pandas_edgelist(pd.DataFrame(edges), 'n1', 'n2')
+    else:
+        G = nx.petersen_graph()
+    
+    return hvnx.draw(G, with_labels=True)
+```
+
 ## Components 
 
 ```python
@@ -104,38 +133,45 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 ```
 
 ```python
-pn.Column(autocomplete, candidates).servable()
-```
-
-```python
 # button to trigger co-author search
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
-coauthors = pn.widgets.Tabulator(pd.DataFrame())
+# network widget
+coauthors = pn.panel(network_widget(nodes=[], edges=[]))  # init sample graph
 
 def process_selection(event):
-    nodes, edges = coauthor_net(candidates.value.iloc[candidates.selection].id.to_list())
-    coauthors.value = pd.DataFrame(nodes)
+    selection = candidates.value.iloc[candidates.selection]
+    if not selection.empty:
+        nodes, edges = coauthor_net(selection.id.to_list())
+    else:
+        nodes = edges = []
+    coauthors.object = network_widget(nodes, edges)
     
-start_button.on_click(process_selection)
-
-pn.Column(start_button, coauthors).servable()
+start_button.on_click(process_selection);
 ```
 
 ```python
-# from pelote import edges_table_to_graph, tables_to_graph
+template = pn.template.BootstrapTemplate(
+    title='What is my coauthor network?'
+)
+template.main.append(
+    pn.Column(
+        pn.Row(autocomplete, start_button),
+        candidates,
+        coauthors,
+        sizing_mode='stretch_both'
+    )
+)
+
+# make page servable
+template.servable();  # ; to prevent inline output / use preview instead
 ```
 
 ```python
-# g = tables_to_graph(
-#     nodes, 
-#     edges, 
-#     node_col="n", node_data=["entity"], 
-#     edge_data=["type"], 
-#     edge_source_col="n1",
-#     edge_target_col="n2",
-#     directed=False
-# )
+# test
+#pn.Column(autocomplete, candidates, start_button, coauthors)
+```
 
-# Sigma(g, node_color='entity', node_size=g.degree)
+```python
+
 ```
