@@ -19,8 +19,8 @@ import panel as pn
 
 import requests
 import pandas as pd
-
 from pyalex import Works
+
 import hvplot.networkx as hvnx
 import networkx as nx
 
@@ -48,13 +48,20 @@ def suggest_authors(name_part):
 ### Find coauthors / create network
 
 ```python
-def coauthor_net(author_ids, author_names, depth=1, edges=[], labels={}):
+def coauthor_net(author_ids, author_names, depth=1, edges=None, labels=None):
     '''
     author_ids: for search, only the first is used as node id
     depth=2: coauthors of coauthors
     # TODO: when depth=2, we might create nodes for aids that were not assigned a node before (depth=1)
     # e.g. when authorX has two ids under the same name
     '''
+
+    # recall: default arguments are evaulated at def i.e. mutable objects will be re-used with each call
+    if edges is None:
+        edges = []
+    if labels is None:
+        labels = {}
+    
     
     # add name for self
     # for recursive calls: we've already added it 
@@ -116,21 +123,20 @@ def network_widget(edges, labels={}):
         
     pos = nx.spring_layout(G)
     
-    nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
-    edges = hvnx.draw_networkx_edges(G, pos, alpha=0.4)
+    g_nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
+    g_edges = hvnx.draw_networkx_edges(G, pos, alpha=0.4)
     
-    return nodes * edges
+    return g_nodes * g_edges
 ```
 
 ```python
 # test
-aids = ['https://openalex.org/A2509690250']
-anames = ['Joeri Both']
-edges, labels = coauthor_net(aids, anames)
+#aids = ['https://openalex.org/A2509690250']
+#anames = ['Joeri Both']
+#edges, labels = coauthor_net(aids, anames)
 ```
 
 ```python
-# test
 #pn.panel(network_widget(edges, labels), width=800, height=800).servable()
 #pn.panel(network_widget([]), width=800, height=800).servable()
 ```
@@ -138,19 +144,21 @@ edges, labels = coauthor_net(aids, anames)
 ## Components 
 
 ```python
-autocomplete = pn.widgets.TextInput(placeholder='Start typing')
+autocomplete = pn.widgets.TextInput(placeholder='Author name (press Enter to autocomplete)')
 ```
 
 ```python
-# suggestions table, updated by autocomplete (triggers suggest_authors)
-candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.value_input),
-                                  #layout='fit_columns', 
-                                  show_index=False, widths={'hint': '40%'},
+# suggestions table, updated by pressing Enter on autocomplete (triggers suggest_authors)
+candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.value),
+                                  sizing_mode='stretch_width',
+                                  widths={'display_name': '60%', 'works_count': '40%'}, 
+                                  #widths={'hint': '40%'},
+                                  show_index=False, 
                                   disabled=True,  # make non-editable
                                   selectable='toggle',  # user can select fitting candidates
                                   titles={'display_name': 'Name', 'hint': 'Work (most-cited)', 
                                           'works_count': '# Works', 'external_id': 'ID'},
-                                  hidden_columns=['id', 'cited_by_count', 'entity_type', 'filter_key'])
+                                  hidden_columns=['id', 'cited_by_count', 'entity_type', 'filter_key', 'hint', 'external_id'])
 ```
 
 ```python
@@ -158,11 +166,14 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
 # network widget
-coauthors = pn.panel(network_widget(edges=[]),  # init sample graph
-                     width=800, height=800) 
+coauthors = pn.panel(network_widget([]),  # init sample graph
+                     #width=800, height=800
+                     sizing_mode='stretch_both'
+                    ) 
 
 def process_selection(event):
     selection = candidates.value.iloc[candidates.selection]
+    #candidates.selection = [] # reset selection, TODO -> keep previous data and find links between authors
     if not selection.empty:
         edges, labels = coauthor_net(selection.id.to_list(), selection.display_name.to_list())
     else:
@@ -176,12 +187,17 @@ start_button.on_click(process_selection);
 template = pn.template.BootstrapTemplate(
     title='What is my coauthor network?'
 )
-template.main.append(
+template.sidebar.append(
     pn.Column(
-        pn.Row(autocomplete, start_button),
-        candidates,
+            autocomplete, 
+            start_button,
+            candidates,
+        )
+)
+template.main.append(
+    pn.Row( 
         coauthors,
-        sizing_mode='stretch_both'
+        #sizing_mode='stretch_both'  # -> caused issues with toggling in tabulator
     )
 )
 
