@@ -18,6 +18,7 @@ jupyter:
 import panel as pn
 
 import requests
+import json
 import pandas as pd
 from pyalex import Works
 
@@ -48,7 +49,15 @@ def suggest_authors(name_part):
 ### Find coauthors / create network
 
 ```python
-def coauthor_net(author_ids, author_names, depth=1, edges=None, labels=None):
+def fetch_works(author_ids, fields):
+    works = []
+    works_pages = Works().filter(author={"id": '|'.join(author_ids)}).select(fields).paginate(per_page=200)
+    for works_page in works_pages:
+        works.extend(works_page)
+    return works
+
+
+def coauthor_net(works, author_ids, author_name, depth=1, edges=None, labels=None):
     '''
     author_ids: for search, only the first is used as node id
     depth=2: coauthors of coauthors
@@ -66,38 +75,35 @@ def coauthor_net(author_ids, author_names, depth=1, edges=None, labels=None):
     # add name for self
     # for recursive calls: we've already added it 
     if author_ids[0] not in labels:
-        labels[author_ids[0]] = author_names[0]
+        labels[author_ids[0]] = author_name
     
-    works_pages = Works().filter(author={"id": '|'.join(author_ids)}).select(["authorships"]).paginate(per_page=200)
-
     coauthor_ids = set()  # for recursive calls
-    for works in works_pages:
-        for work in works:
-            for authorship in work['authorships']:
-                aid = authorship['author'].get('id')
-                if aid not in author_ids:  # don't add self reference
-                    coauthor_ids.add(aid)
-                    name = authorship['author'].get('display_name')
-                    if name:  # without a name, don't include in network
-                        edges.append({'n1': author_ids[0], 'n2': aid, 'type': 'works_with'})
-                        if aid not in labels:
-                            labels[aid] = name
-                else:  # only add affiliation
-                    aid = author_ids[0]
-                    name = author_names[0]
-                if name:
-                    # institutes
-                    for institute in authorship['institutions']:
-                        iid = institute.get('id')
-                        iname = institute.get('display_name')
-                        if iid and iname:
-                            edges.append({'n1': aid, 'n2': iid, 'type': 'works_at'})
-                            if iid not in labels:
-                                labels[iid] = iname
+    for work in works:
+        for authorship in work['authorships']:
+            aid = authorship['author'].get('id')
+            if aid not in author_ids:  # don't add self reference
+                coauthor_ids.add(aid)
+                name = authorship['author'].get('display_name')
+                if name:  # without a name, don't include in network
+                    edges.append({'n1': author_ids[0], 'n2': aid, 'type': 'works_with'})
+                    if aid not in labels:
+                        labels[aid] = name
+            else:  # only add affiliation
+                aid = author_ids[0]
+                name = author_name
+            if name:
+                # institutes
+                for institute in authorship['institutions']:
+                    iid = institute.get('id')
+                    iname = institute.get('display_name')
+                    if iid and iname:
+                        edges.append({'n1': aid, 'n2': iid, 'type': 'works_at'})
+                        if iid not in labels:
+                            labels[iid] = iname
 
     if depth > 1:
         for aid in coauthor_ids:
-            coauthor_net([aid], [labels[aid]], depth-1, edges, labels)
+            coauthor_net(works, [aid], labels[aid], depth-1, edges, labels)
 
     return edges, labels
 ```
@@ -169,6 +175,10 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 # button to trigger co-author search
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
+# list to persist fetched works
+works_pane = pn.pane.JSON('[]')
+author_ids_pane = pn.pane.JSON('[]')
+
 # network widget
 coauthors = pn.panel(network_widget([]),  # init sample graph
                      #width=800, height=800
@@ -177,9 +187,19 @@ coauthors = pn.panel(network_widget([]),  # init sample graph
 
 def process_selection(event):
     selection = candidates.value.iloc[candidates.selection]
-    #candidates.selection = [] # reset selection, TODO -> keep previous data and find links between authors
+    works = []
+    # fetch works only if selection is different
+    author_ids = json.loads(author_ids_pane.object)
     if not selection.empty:
-        edges, labels = coauthor_net(selection.id.to_list(), selection.display_name.to_list())
+        if set(selection.id.to_list()) != set(author_ids):
+            author_ids = selection.id.to_list()
+            author_ids_pane.object = json.dumps(author_ids)
+            works = fetch_works(author_ids, ['authorships'])
+            works_pane.object = json.dumps(works)
+        else:
+            works = json.loads(works_pane.object)
+    if len(works) > 0:
+        edges, labels = coauthor_net(works, author_ids, selection.display_name.to_list()[0])
     else:
         edges = []; labels = None
     coauthors.object = network_widget(edges, labels)
