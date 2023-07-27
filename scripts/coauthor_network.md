@@ -75,21 +75,25 @@ def coauthor_net(author_ids, author_names, depth=1, edges=None, labels=None):
         for work in works:
             for authorship in work['authorships']:
                 aid = authorship['author'].get('id')
-                if aid not in author_ids:  # no need to add self
+                if aid not in author_ids:  # don't add self reference
                     coauthor_ids.add(aid)
                     name = authorship['author'].get('display_name')
                     if name:  # without a name, don't include in network
                         edges.append({'n1': author_ids[0], 'n2': aid, 'type': 'works_with'})
                         if aid not in labels:
                             labels[aid] = name
-                        # institutes
-                        for institute in authorship['institutions']:
-                            iid = institute.get('id')
-                            iname = institute.get('display_name')
-                            if iid and iname:
-                                edges.append({'n1': aid, 'n2': iid, 'type': 'works_at'})
-                                if iid not in labels:
-                                    labels[iid] = iname
+                else:  # only add affiliation
+                    aid = author_ids[0]
+                    name = author_names[0]
+                if name:
+                    # institutes
+                    for institute in authorship['institutions']:
+                        iid = institute.get('id')
+                        iname = institute.get('display_name')
+                        if iid and iname:
+                            edges.append({'n1': aid, 'n2': iid, 'type': 'works_at'})
+                            if iid not in labels:
+                                labels[iid] = iname
 
     if depth > 1:
         for aid in coauthor_ids:
