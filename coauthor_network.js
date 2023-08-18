@@ -75,11 +75,12 @@ pn.extension('tabulator', 'plotly')
 
 def suggest_authors(name_part):
 
-    url_author_ac = 'https://api.openalex.org/autocomplete/authors'
-    params = {'q': name_part}
-    
-    r = requests.get(url_author_ac, params=params)
-    if r.status_code == 200:
+    if name_part:
+        url_author_ac = 'https://api.openalex.org/autocomplete/authors'
+        params = {'q': name_part}
+        
+        r = requests.get(url_author_ac, params=params)
+        #if r.status_code == 200:
         return pd.DataFrame(r.json()['results'])
     else:
         return pd.DataFrame()
