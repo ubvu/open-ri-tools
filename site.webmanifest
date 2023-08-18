@@ -1,7 +1,7 @@
 {
   "name": "Open RI",
   "short_name": "Open RI",
-  "start_url": "clinical_trials.html",
+  "start_url": "index.html",
   "icons": [
     {
       "src": "images/icon-vector.svg",
