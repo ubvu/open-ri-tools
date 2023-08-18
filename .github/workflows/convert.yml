@@ -1,7 +1,6 @@
 name: convert-to-website
 
 on:
-  workflow_dispatch:
   push:
     branches: 
       - 'main'
@@ -22,7 +21,7 @@ jobs:
           python-version: '3.10'
       - name: Packages
         run: |
-          pip install notebook panel plotly jupytext
+          pip install jupyterlab==4.0.3 panel==1.2.1 bokeh==3.2.1 plotly==5.15.0 jupytext==1.14.7 hvplot==0.8.4 pyalex==0.11 networkx[default]==3.1
       - name: Convert
         run: |
           jupytext --sync scripts/*
