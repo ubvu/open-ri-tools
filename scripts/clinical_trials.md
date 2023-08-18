@@ -166,6 +166,7 @@ formatters = {
 cols = df_widget.value.columns; w_rest = 60/(len(cols)-1)
 widths = {c:f'{w_rest}%' if c != 'title' else f'{100-(w_rest*(len(cols)-1))}%' for c in df_widget.value.columns}
 widget_table = pn.widgets.Tabulator(df_widget,  # implicitly binds table to df
+                                    disabled=True,
                                     formatters=formatters, sizing_mode="stretch_both", show_index=False, widths=widths)
 # table filters
 # checkbox
