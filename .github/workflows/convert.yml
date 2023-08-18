@@ -1,7 +1,6 @@
 name: convert-to-website
 
 on:
-  workflow_dispatch:
   push:
     branches: 
       - 'main'
