@@ -1,4 +1,4 @@
-importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.0/full/pyodide.js");
+importScripts("https://cdn.jsdelivr.net/pyodide/v0.23.4/pyc/pyodide.js");
 
 function sendPatch(patch, buffers, msg_id) {
   self.postMessage({
@@ -15,7 +15,7 @@ async function startApplication() {
   self.pyodide.globals.set("sendPatch", sendPatch);
   console.log("Loaded!");
   await self.pyodide.loadPackage("micropip");
-  const env_spec = ['https://cdn.holoviz.org/panel/1.2.0/dist/wheels/bokeh-3.2.0-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.2.0/dist/wheels/panel-1.2.0-py3-none-any.whl', 'pyodide-http==0.2.1', 'pandas', 'plotly', 'requests']
+  const env_spec = ['https://cdn.holoviz.org/panel/1.2.1/dist/wheels/bokeh-3.2.2-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.2.1/dist/wheels/panel-1.2.1-py3-none-any.whl', 'pyodide-http==0.2.1', 'pandas', 'plotly', 'requests']
   for (const pkg of env_spec) {
     let pkg_name;
     if (pkg.endsWith('.whl')) {
@@ -224,6 +224,7 @@ formatters = {
 cols = df_widget.value.columns; w_rest = 60/(len(cols)-1)
 widths = {c:f'{w_rest}%' if c != 'title' else f'{100-(w_rest*(len(cols)-1))}%' for c in df_widget.value.columns}
 widget_table = pn.widgets.Tabulator(df_widget,  # implicitly binds table to df
+                                    disabled=True,
                                     formatters=formatters, sizing_mode="stretch_both", show_index=False, widths=widths)
 # table filters
 # checkbox
