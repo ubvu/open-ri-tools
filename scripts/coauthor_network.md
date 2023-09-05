@@ -23,13 +23,14 @@ import pandas as pd
 from pyalex import Works
 
 import hvplot.networkx as hvnx
-from holoviews import HoloMap
+from holoviews import HoloMap, dim
 import networkx as nx
 
 pn.extension('tabulator', 'plotly')
 ```
 
 ```python
+dev = True
 offline = True  # when developing offline we load local data
 ```
 
@@ -61,8 +62,9 @@ def fetch_works(author_ids, fields):
 ```
 
 ```python
-def extract_coauthors(works, author_ids, author_name):
-
+def process_works(works, author_ids, author_name):
+    # extract coauthors and affiliations
+    
     coauthors = []; affiliations = []
     
     for work in works:
@@ -124,13 +126,15 @@ def calc_works_cumsum(df):
 Test backend
 
 ```python
-# aids = ['https://openalex.org/A5076642362']  # https://openalex.org/A5028049278
-# works = fetch_works(aids, ['publication_year', 'authorships'])
-# coauthors, affiliations = extract_coauthors(works, aids, 'test_name')
+if dev:
+    aids = ['https://openalex.org/A5076642362']  # https://openalex.org/A5028049278
+    works = fetch_works(aids, ['publication_year', 'authorships'])
+    coauthors, affiliations = process_works(works, aids, 'test_name')
+    cc = calc_works_cumsum(coauthors)
 ```
 
 ```python
-# calc_works_cumsum(coauthors)
+#cc.pivot(index='id', columns='year', values='cumsum').reset_index()
 ```
 
 ### Network
@@ -148,32 +152,66 @@ def node_properties(pos):
             node_size.append(300)
     return {'node_color': node_color, 'node_size': node_size}
 
+    
+def make_network_widget(works, author_ids, author_name):
 
-def make_graph(edges: pd.DataFrame, labels=None):
-    if not edges.empty:
-        G = nx.from_pandas_edgelist(edges, 'n1', 'n2', 'type')
+    works = json.loads(works) 
+    author_ids = json.loads(author_ids)
+    
+    df, _ = process_works(works, author_ids, author_name)  # TODO only coauthors for now
+
+    if not df.empty:
+        years = df.year.unique()
+        df = calc_works_cumsum(df)
+        # prepare edges, add year:cumsum as attributes
+        df = df.pivot(index='id', columns='year', values='cumsum')
+        df = df.reset_index()
+        df['source_id'] = author_ids[0]
+        # create graph
+        G = nx.from_pandas_edgelist(df, 'source_id', 'id', edge_attr=True)
     else:
         G = nx.petersen_graph()  
     pos = nx.spring_layout(G)
-    return G, pos
 
+    # create sub graphs
+    if not df.empty:
+        hvplots = {}
+        max_cs = df[max(years)].max()
+        for year in years:
+            nodes = hvnx.draw_networkx_nodes(G, pos)
+            edges = hvnx.draw_networkx_edges(G, pos, edge_width=dim(str(year))/max_cs)  # TODO edge width seems random
+            hvplots[year] = nodes * edges
+    else:
+        hvplots = {1: hvnx.draw_networkx(G, pos)}
+        
+    # create HoloMap
+    hm = HoloMap(hvplots, kdims='Year')
+
+    return hm
     
-def network_widget(G, pos, year):
+    # # nodes
+    # g_nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
+    # # edges and line types
+    # esolid = []; edashd = []
+    # for (u, v, attr) in G.edges(data=True):
+    #     if attr.get('type', '') == 'related_to':
+    #         edashd.append((u, v))
+    #     else:
+    #         esolid.append((u, v))
+    # g_edges1 = hvnx.draw_networkx_edges(G, pos, edgelist=esolid, edge_width=4 if len(edashd)>0 else 1, alpha=0.7, style='solid')  # increase width when mixed with dashed
+    # g_edges2 = hvnx.draw_networkx_edges(G, pos, edgelist=edashd, edge_width=1, alpha=0.7, style='dashed')
+    # return g_nodes * g_edges1 * g_edges2
+```
 
-    # create nodes, edges with properties
+Test
 
-    # nodes
-    g_nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
-    # edges and line types
-    esolid = []; edashd = []
-    for (u, v, attr) in G.edges(data=True):
-        if attr.get('type', '') == 'related_to':
-            edashd.append((u, v))
-        else:
-            esolid.append((u, v))
-    g_edges1 = hvnx.draw_networkx_edges(G, pos, edgelist=esolid, edge_width=4 if len(edashd)>0 else 1, alpha=0.7, style='solid')  # increase width when mixed with dashed
-    g_edges2 = hvnx.draw_networkx_edges(G, pos, edgelist=edashd, edge_width=1, alpha=0.7, style='dashed')
-    return g_nodes * g_edges1 * g_edges2
+```python
+if dev:
+    hm = make_network_widget(json.dumps(works), json.dumps(aids), 'test_name')
+```
+
+```python
+#hm
 ```
 
 ## Components 
@@ -201,13 +239,16 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
 # list to persist fetched works
-works_pane = pn.pane.JSON('[]')
-author_ids_pane = pn.pane.JSON('[]')
+works = pn.pane.JSON('[]')
+author_ids = pn.pane.JSON('[]')
+author_name = pn.pane.Str('')
 
 # network widget
+network_widget = pn.bind(network_widget, works=works, author_ids=author_ids, name=author_name)
+
 #def create_holomap():
 #    hm_default = HoloMap({i: network_widget(pd.DataFrame()) for i in range(3)})
-if not debug:
+if not offline:
     coauthors = pn.panel(HoloMap({i: network_widget(pd.DataFrame()) for i in range(10)}), sizing_mode='stretch_both')    
 else:
     with open('../data/coauthors_dev.json', 'r') as f:
@@ -248,7 +289,7 @@ def process_selection(event):
             works = fetch_works(author_ids, ['publication_year', 'authorships'])
             works_pane.object = json.dumps(works)
         else:
-            works = json.loads(works_pane.object)
+            pass
         author_name = selection.display_name.to_list()[0]
     # load local works when in debug mode
     elif debug:
@@ -305,12 +346,12 @@ template.sidebar.append(
             candidates,
             cb_aff,
             cb_year,
-            #coauthors[1]  # widgets of the HoloMap, TODO: when coauthors is single network, this won't work
+            network_widget[1]  # widgets of the HoloMap, TODO: when coauthors is single network, this won't work
         )
 )
 template.main.append(
     pn.Row(
-        coauthors,
+        network_widget[0],
         #sizing_mode='stretch_both'  # -> caused issues with toggling in tabulator
     )
 )
