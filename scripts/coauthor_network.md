@@ -30,7 +30,7 @@ pn.extension('tabulator', 'plotly')
 ```
 
 ```python
-dev = True
+dev = False
 offline = True  # when developing offline we load local data
 ```
 
@@ -130,11 +130,6 @@ if dev:
     aids = ['https://openalex.org/A5076642362']  # https://openalex.org/A5028049278
     works = fetch_works(aids, ['publication_year', 'authorships'])
     coauthors, affiliations = process_works(works, aids, 'test_name')
-    cc = calc_works_cumsum(coauthors)
-```
-
-```python
-#cc.pivot(index='id', columns='year', values='cumsum').reset_index()
 ```
 
 ### Network
@@ -153,22 +148,29 @@ def node_properties(pos):
     return {'node_color': node_color, 'node_size': node_size}
 
     
-def make_network_widget(works, author_ids, author_name):
-
-    works = json.loads(works) 
-    author_ids = json.loads(author_ids)
+def make_network_widget(data_cache):
+ 
+    works = data_cache.get('works', []) 
+    author_ids = data_cache.get('author_ids')
+    author_name = data_cache.get('author_name')
     
     df, _ = process_works(works, author_ids, author_name)  # TODO only coauthors for now
 
     if not df.empty:
-        years = df.year.unique()
-        df = calc_works_cumsum(df)
+        #years = df.year.astype(str).unique()
+        years = df.year.unique()  # keep years for slider
+        # keep names as node labels
+        labels = {record['id']:record['name'] for record in df.to_dict('records')}
+        labels[author_ids[0]] = author_name  # add self
+
         # prepare edges, add year:cumsum as attributes
-        df = df.pivot(index='id', columns='year', values='cumsum')
-        df = df.reset_index()
-        df['source_id'] = author_ids[0]
+        df_edges = calc_works_cumsum(df.copy())
+        #df_edges['year'] = df_edges.year.astype(str)  # for dim()
+        df_edges = df_edges.pivot(index='id', columns='year', values='cumsum')
+        df_edges = df_edges.reset_index()
+        df_edges['source_id'] = author_ids[0]
         # create graph
-        G = nx.from_pandas_edgelist(df, 'source_id', 'id', edge_attr=True)
+        G = nx.from_pandas_edgelist(df_edges, 'source_id', 'id', edge_attr=True)
     else:
         G = nx.petersen_graph()  
     pos = nx.spring_layout(G)
@@ -176,19 +178,20 @@ def make_network_widget(works, author_ids, author_name):
     # create sub graphs
     if not df.empty:
         hvplots = {}
-        max_cs = df[max(years)].max()
+        max_cs = df_edges[max(years)].max()
         for year in years:
-            nodes = hvnx.draw_networkx_nodes(G, pos)
-            edges = hvnx.draw_networkx_edges(G, pos, edge_width=dim(str(year))/max_cs)  # TODO edge width seems random
+            nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels)
+            #edges = hvnx.draw_networkx_edges(G, pos, edge_width=dim(year)/max_cs)  # TODO edge width seems random
+            edges = hvnx.draw_networkx_edges(G, pos, alpha=dim(str(year))/max_cs)
             hvplots[year] = nodes * edges
     else:
         hvplots = {1: hvnx.draw_networkx(G, pos)}
         
     # create HoloMap
     hm = HoloMap(hvplots, kdims='Year')
-
     return hm
-    
+    #return hvplots
+   
     # # nodes
     # g_nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
     # # edges and line types
@@ -207,11 +210,7 @@ Test
 
 ```python
 if dev:
-    hm = make_network_widget(json.dumps(works), json.dumps(aids), 'test_name')
-```
-
-```python
-#hm
+    hm = make_network_widget(json.dumps({'works': works, 'author_ids': aids, 'author_name': 'test_name'}))
 ```
 
 ## Components 
@@ -238,101 +237,38 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 # button to trigger co-author search
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
-# list to persist fetched works
-works = pn.pane.JSON('[]')
-author_ids = pn.pane.JSON('[]')
-author_name = pn.pane.Str('')
+# list to persist fetched works and author data
+data_cache = pn.widgets.JSONEditor(value={})
+author_ids_cache = pn.pane.JSON('[]')  # just used for selection check
 
 # network widget
-network_widget = pn.bind(network_widget, works=works, author_ids=author_ids, name=author_name)
-
-#def create_holomap():
-#    hm_default = HoloMap({i: network_widget(pd.DataFrame()) for i in range(3)})
-if not offline:
-    coauthors = pn.panel(HoloMap({i: network_widget(pd.DataFrame()) for i in range(10)}), sizing_mode='stretch_both')    
-else:
-    with open('../data/coauthors_dev.json', 'r') as f:
-        works = json.loads(f.read())
-    author_ids = ['https://openalex.org/A5028049278']
-    author_name = 'test author'
-    works_by_year_cum = {}
-    for work in works:
-        year = work['publication_year']
-        if year not in works_by_year_cum:
-            works_by_year_cum[year] = [work]
-        else:
-            works_by_year_cum[year].append(work)
-        for y in works_by_year_cum:
-            if year<y:
-                works_by_year_cum[y].append(work)
-    edges = []; labels = []; years = []
-    for y in works_by_year_cum:
-        e, l = coauthor_net(works_by_year_cum[y], author_ids, author_name)
-        edges.append(e); labels.append(l); years.append(y)
-    coauthors = pn.panel(HoloMap({int(y): network_widget(e, l) for e, l, y in zip(edges, labels, years)}, kdims='Publication year'), sizing_mode='stretch_both')
+network_widget = pn.bind(make_network_widget, data_cache)
+network_pane = pn.panel(network_widget, center=True, widget_location='top')    
 
 # affiliations-only checkbox
-cb_aff = pn.widgets.Checkbox(name='Affiliations only')
-
-## year animiation
-cb_year = pn.widgets.Checkbox(name='Publication year')
+#cb_aff = pn.widgets.Checkbox(name='Affiliations only')
 
 def process_selection(event):
     selection = candidates.value.iloc[candidates.selection]
     works = []
-    # fetch works only if selection is different
-    author_ids = json.loads(author_ids_pane.object)
+    author_ids = json.loads(author_ids_cache.object)
     if not selection.empty:
+        # fetch works only if selection is different
         if set(selection.id.to_list()) != set(author_ids):
             author_ids = selection.id.to_list()
-            author_ids_pane.object = json.dumps(author_ids)
             works = fetch_works(author_ids, ['publication_year', 'authorships'])
-            works_pane.object = json.dumps(works)
+            # replace cache
+            author_ids_cache.object = json.dumps(author_ids)
+            data_cache.value = {'works': works, 'author_ids': author_ids, 'author_name': selection.display_name.to_list()[0]}
         else:
             pass
-        author_name = selection.display_name.to_list()[0]
-    # load local works when in debug mode
-    elif debug:
+    # load local works when offline
+    elif offline:
         with open('../data/coauthors_dev.json', 'r') as f:
             works = json.loads(f.read())
-        author_ids = ['https://openalex.org/A5028049278']
-        author_name = 'test author'
-    if len(works) > 0:
-        # create network
-        if not cb_year.value:
-            edges, labels = coauthor_net(works, author_ids, author_name)
-            # show affiliations only?
-            if cb_aff.value:
-                edges = extract_affiliations(edges, author_ids)
-        else:
-            works_by_year_cum = {}
-            for work in works:
-                year = work['publication_year']
-                if year not in works_by_year_cum:
-                    works_by_year_cum[year] = [work]
-                else:
-                    works_by_year_cum[year].append(work)
-                for y in works_by_year_cum:
-                    if year<y:
-                        works_by_year_cum[y].append(work)
-            edges = []; labels = []; years = []
-            for y in works_by_year_cum:
-                e, l = coauthor_net(works_by_year_cum[y], author_ids, author_name)
-                edges.append(e); labels.append(l); years.append(y)
-    else:
-        edges = pd.DataFrame(); labels = None
-    if type(edges)==pd.DataFrame:
-        coauthors.object = network_widget(edges, labels)
-    elif type(edges)==list:
-        pass
-        #hm = {int(y): network_widget(e, l) for e, l, y in zip(edges, labels, years)}
-        #coauthors.parobject = HoloMap({i:hm[k] for i, k in enumerate(hm) if i<=2}, kdims='Publication year')
+        data_cache.value = {'works': works, 'author_ids': ['https://openalex.org/A5028049278'], 'author_name': 'test author'}
     
 start_button.on_click(process_selection);
-```
-
-```python
-#coauthors_panel = pn.panel(pn.bind(create_holomap, works_pane))
 ```
 
 ```python
@@ -344,15 +280,12 @@ template.sidebar.append(
             autocomplete, 
             start_button,
             candidates,
-            cb_aff,
-            cb_year,
-            network_widget[1]  # widgets of the HoloMap, TODO: when coauthors is single network, this won't work
+            #cb_aff,
         )
 )
 template.main.append(
     pn.Row(
-        network_widget[0],
-        #sizing_mode='stretch_both'  # -> caused issues with toggling in tabulator
+        network_pane
     )
 )
 
