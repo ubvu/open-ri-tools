@@ -23,8 +23,9 @@ import pandas as pd
 from pyalex import Works
 
 import hvplot.networkx as hvnx
-from holoviews import HoloMap, dim
 import networkx as nx
+from holoviews import HoloMap, dim
+from holoviews.util import Dynamic
 
 pn.extension('tabulator', 'plotly')
 ```
@@ -189,7 +190,7 @@ def make_network_widget(data_cache):
         
     # create HoloMap
     hm = HoloMap(hvplots, kdims='Year')
-    return hm
+    return Dynamic(hm)
     #return hvplots
    
     # # nodes
@@ -210,7 +211,7 @@ Test
 
 ```python
 if dev:
-    hm = make_network_widget(json.dumps({'works': works, 'author_ids': aids, 'author_name': 'test_name'}))
+    hm = make_network_widget({'works': works, 'author_ids': aids, 'author_name': 'test_name'})
 ```
 
 ## Components 
