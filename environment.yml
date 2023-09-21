@@ -7,5 +7,5 @@ dependencies:
   - pyviz::hvplot=0.8.4
   - plotly=5.15.0
   - pip:
-    - pyalex=0.11
-    - networkx[default]=3.1
+    - pyalex==0.11
+    - networkx[default]==3.1
