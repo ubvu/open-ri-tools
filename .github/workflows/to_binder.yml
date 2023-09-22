@@ -24,7 +24,7 @@ jobs:
       - name: Move
         run: |
           mkdir mybinder
-          cp -r notebooks mybinder/notebooks
+          cp -r notebooks/* mybinder
           cp environment-binder.yml mybinder/environment.yml
       - name: Deploy
         uses: s0/git-publish-subdir-action@develop
