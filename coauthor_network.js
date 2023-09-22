@@ -15,7 +15,7 @@ async function startApplication() {
   self.pyodide.globals.set("sendPatch", sendPatch);
   console.log("Loaded!");
   await self.pyodide.loadPackage("micropip");
-  const env_spec = ['https://cdn.holoviz.org/panel/1.2.1/dist/wheels/bokeh-3.2.1-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.2.1/dist/wheels/panel-1.2.1-py3-none-any.whl', 'pyodide-http==0.2.1', 'hvplot', 'networkx', 'pandas', 'pyalex', 'requests']
+  const env_spec = ['https://cdn.holoviz.org/panel/1.2.1/dist/wheels/bokeh-3.2.1-py3-none-any.whl', 'https://cdn.holoviz.org/panel/1.2.1/dist/wheels/panel-1.2.1-py3-none-any.whl', 'pyodide-http==0.2.1', 'holoviews', 'hvplot', 'networkx', 'pandas', 'pyalex', 'requests']
   for (const pkg of env_spec) {
     let pkg_name;
     if (pkg.endsWith('.whl')) {
@@ -62,13 +62,18 @@ from pyalex import Works
 
 import hvplot.networkx as hvnx
 import networkx as nx
+from holoviews import HoloMap, dim
+from holoviews.util import Dynamic
+from holoviews import opts
+
+from bokeh.models import HoverTool
 
 pn.extension('tabulator', 'plotly')
 
 
 # ## Backend
 
-# ### Find author (autocomplete)
+# ### Data
 
 # In[ ]:
 
@@ -80,13 +85,10 @@ def suggest_authors(name_part):
         params = {'q': name_part}
         
         r = requests.get(url_author_ac, params=params)
-        #if r.status_code == 200:
         return pd.DataFrame(r.json()['results'])
     else:
         return pd.DataFrame()
 
-
-# ### Find coauthors / create network
 
 # In[ ]:
 
@@ -99,130 +101,191 @@ def fetch_works(author_ids, fields):
     return works
 
 
-def coauthor_net(works, author_ids, author_name, depth=1, edges=None, labels=None):
-    '''
-    author_ids: only the first is used as node id
-    TODO depth=2: coauthors of coauthors
-    '''
+# In[ ]:
 
-    # default arguments are evaluated at def i.e. lists will be re-used in each call
-    # use None instead, create list at runtime
-    if edges is None:
-        edges = []
-    if labels is None:
-        labels = {}
+
+def process_works(works, author_ids, author_name):
+    # extract coauthors and affiliations
     
-    # add name for self
-    # for recursive calls: we've already added it 
-    if author_ids[0] not in labels:
-        labels[author_ids[0]] = author_name
+    coauthors = []
+    affiliations = []  # for edges: author(incl. self)-institute; keep work id for institutes cumsum
+    years = set()  # years for authors and institutes might differ
     
-    coauthor_ids = set()  # for recursive calls
     for work in works:
+        years.add(work['publication_year'])
         for authorship in work['authorships']:
             aid = authorship['author'].get('id')
-            if aid not in author_ids:  # don't add self reference
-                coauthor_ids.add(aid)
+            # add coauthors
+            if aid not in author_ids:  # self is not coauthor
                 name = authorship['author'].get('display_name')
-                if name:  # without a name, don't include in network
-                    edges.append({'n1': author_ids[0], 'n2': aid, 'type': 'works_with'})
-                    if aid not in labels:
-                        labels[aid] = name
-            else:  # only add affiliation
+                if name:
+                    coauthors.append({'id': aid, 'name': name, 'year': work['publication_year']})
+            else:  
+                # self: only add affiliation
                 aid = author_ids[0]
                 name = author_name
+            # add affiliations
             if name:
-                # institutes
                 for institute in authorship['institutions']:
                     iid = institute.get('id')
                     iname = institute.get('display_name')
                     if iid and iname:
-                        edges.append({'n1': aid, 'n2': iid, 'type': 'works_at'})
-                        if iid not in labels:
-                            labels[iid] = iname
+                        affiliations.append({'aid': aid, 'iid': iid, 'name': iname, 'wid': work['id'], 'year': work['publication_year']})
 
-    #if depth > 1:
-    #    for aid in coauthor_ids:
-    #        coauthor_net(works, [aid], labels[aid], depth-1, edges, labels)
+    return pd.DataFrame(coauthors), pd.DataFrame(affiliations), list(years)
 
-    return pd.DataFrame(edges), labels
-
-
-def extract_affiliations(edges, author_ids):
-    e_prim = edges.copy()[(edges.type=='works_at') & (edges.n1 == author_ids[0])]  # primary affiliations
-    # connect co-author affiliations to main author (secondary affiliations)
-    e_scnd =  edges.copy()[(edges.type=='works_at') & (edges.n1 != author_ids[0])]
-    e_scnd['type'] = 'related_to'
-    e_scnd['n1'] = author_ids[0]
-    # primary over secondary
-    e_scnd = e_scnd[~e_scnd.n2.isin(e_prim.n2)]
-    return pd.concat([e_prim, e_scnd], axis=0).drop_duplicates()
-
-
-# ## Create network widget
 
 # In[ ]:
 
 
-def node_properties(pos):
-    node_color = []
-    node_size = []
-    for n in pos:
-        if type(n)==str and n.startswith('https://openalex.org/I'):
-            node_color.append('green')
-            node_size.append(500)
-        else:
-            node_color.append('blue')
-            node_size.append(300)
-    return {'node_color': node_color, 'node_size': node_size}
+def coauthor_cumsum(df, years):
+    # coauthors (nodes): per year, calculate the cumulative sum of works for each coauthor
+    coauthors = df.copy()
+    # works per year
+    coauthors = coauthors.groupby(['id', 'year'], as_index=False).agg(name = ('name', 'first'), count = ('id', 'count'))
+    # add missing years (we use multi index to create a id*year matrix)
+    mindex = pd.MultiIndex.from_product([coauthors.id.unique(), range(min(years), max(years)+1)],
+                                        names = ['id', 'year'])
+    coauthors = pd.DataFrame(index=mindex).merge(coauthors, how='left', left_index=True, right_on=['id', 'year'])
+    # NA = 0 (works), however: name stays the same
+    coauthors['name'] = coauthors.groupby('id')['name'].transform(lambda x: x.fillna(x.dropna().unique()[0]))
+    coauthors['count'] = coauthors.groupby('id')['count'].transform(lambda x: x.fillna(0))
+    # cumsum
+    coauthors['cumsum'] = coauthors.groupby('id')['count'].cumsum()
 
+    return coauthors
+
+
+# In[ ]:
+
+
+def institutes_cumsum(df, years):
+    # 1. affiliations (edges): cumsum works author(incl. self)-institute
+    affiliations = df.copy().drop(columns=['name', 'wid'])
+    affiliations = affiliations.groupby(['aid', 'iid', 'year'], as_index=False).agg(count = ('aid', 'count'))
+    # add missing years (see above)
+    mindex = pd.MultiIndex.from_product([affiliations.aid.unique(), affiliations.iid.unique(), 
+                                         range(min(years), max(years)+1)],
+                                        names = ['aid', 'iid', 'year'])
+    affiliations = pd.DataFrame(index=mindex).merge(affiliations, how='left', left_index=True, right_on=['aid', 'iid', 'year'])
+    # we just combined all authors with all institutes, i.e. remove those without affiliations/edges
+    affiliations = affiliations[~affiliations.groupby(['aid', 'iid'])['count'].transform(lambda x: all(pd.isna(x)))]
+    # NA = 0 (works)
+    affiliations['count'] = affiliations.groupby(['aid', 'iid'])['count'].transform(lambda x: x.fillna(0))
+    # cumsum
+    affiliations['cumsum'] = affiliations.groupby(['aid', 'iid'])['count'].cumsum()
     
-def network_widget(edges: pd.DataFrame, labels=None):
+    # 2. institutes (nodes): cumsum works per institute per year
+    institutes = df.copy().drop_duplicates(['iid', 'wid']).drop(columns=['aid', 'wid'])
+    institutes = institutes.groupby(['iid', 'year'], as_index=False).agg(name = ('name', 'first'), count = ('iid', 'count'))
+    # add missing years (see above)
+    mindex = pd.MultiIndex.from_product([institutes.iid.unique(), range(min(years), max(years)+1)],
+                                        names = ['iid', 'year'])
+    institutes = pd.DataFrame(index=mindex).merge(institutes, how='left', left_index=True, right_on=['iid', 'year'])
+    # NA = 0 (works), however: name stays the same
+    institutes['name'] = institutes.groupby('iid')['name'].transform(lambda x: x.fillna(x.dropna().unique()[0]))
+    institutes['count'] = institutes.groupby('iid')['count'].transform(lambda x: x.fillna(0))
+    # cumsum
+    institutes['cumsum'] = institutes.groupby('iid')['count'].cumsum()
 
+    return affiliations, institutes.rename({'iid': 'id'}, axis=1)
+
+
+# ### Network
+
+# In[ ]:
+
+
+def make_graph(coauthors, affiliations, years, author_ids, author_name):
+    
+    # prepare edges (affiliations)
+    # add year:cumsum as attributes
+    affiliations, institutes = institutes_cumsum(affiliations, years)
+     # scale cumsum to alpha (by author, indicating affiliation strength)
+    affiliations['cumsum'] = (affiliations['cumsum'] / affiliations.groupby('aid')['cumsum'].transform(max))
+    # NOTE holoviews dimensions don't work well with numeric attributes e.g. 2010 (or '2010')
+    # add a prefix to prevent errors
+    affiliations['year'] = 'y' + affiliations.year.astype(str)
+    # from_pandas_edgelist requires wide format for attributes
+    affiliations = affiliations.pivot(index=['aid', 'iid'], columns='year', values='cumsum')
+    affiliations = affiliations.reset_index()
     # create graph
+    G = nx.from_pandas_edgelist(affiliations, 'aid', 'iid', edge_attr=True)
     
-    if not edges.empty:
-        G = nx.from_pandas_edgelist(edges, 'n1', 'n2', 'type')
+    # nodes (coauthors+institutes)
+    coauthors = coauthor_cumsum(coauthors, years)
+    # coauthors without affiliations have to be added manually
+    extra_coauthors_ids = coauthors[~coauthors.id.isin(affiliations.aid)].id.to_list()
+    G.add_nodes_from(extra_coauthors_ids)
+    # set node attributes, add year:cumsum as well
+    # scale to alpha (0-1)
+    coauthors['cumsum'] = coauthors['cumsum'] / coauthors['cumsum'].max()
+    institutes['cumsum'] = institutes['cumsum'] / institutes['cumsum'].max()
+    # combine
+    coauthors['type'] = 'author'
+    institutes['type'] = 'institute'
+    nodes = pd.concat([coauthors, institutes], axis=0)
+    # year->cumsum as attributes
+    nodes['year'] = 'y' + nodes.year.astype(str)
+    # node-attributes format: {id:{attr: a}}
+    node_attributes = nodes.pivot(index=['id'], columns='year', values='cumsum').to_dict('index')
+    # add name and type (author/institute)
+    extra_attributes = nodes[['id', 'name', 'type']].drop_duplicates(['id']).set_index('id').to_dict('index')
+    for node in node_attributes:
+        node_attributes[node]['name'] = extra_attributes[node]['name']
+        node_attributes[node]['type'] = extra_attributes[node]['type']
+    # add self: alpha=1, name, type
+    node_attributes[author_ids[0]] = {'y'+str(y): 1 for y in years}
+    node_attributes[author_ids[0]]['name'] = author_name
+    node_attributes[author_ids[0]]['type'] = 'author'
+    
+    nx.set_node_attributes(G, node_attributes)
+
+    # years for slider 
+    slider_years = [str(y) for y in years]
+    
+    return G, slider_years
+    
+def make_network_widget(data_cache):
+ 
+    works = data_cache.get('works', []) 
+    author_ids = data_cache.get('author_ids')
+    author_name = data_cache.get('author_name')
+    
+    coauthors, affiliations, years = process_works(works, author_ids, author_name)
+
+    if not coauthors.empty:
+        G, years = make_graph(coauthors, affiliations, years, author_ids, author_name)
+        # TODO make this an option
+        G = G.subgraph(max(nx.connected_components(G), key=len))  # only selecting biggest component
     else:
         G = nx.petersen_graph()  
     pos = nx.spring_layout(G)
 
-    # create nodes, edges with properties
-
-    # nodes
-    g_nodes = hvnx.draw_networkx_nodes(G, pos, labels=labels, alpha=0.4, **node_properties(pos))
-    # edges and line types
-    esolid = []; edashd = []
-    for (u, v, attr) in G.edges(data=True):
-        if attr.get('type', '') == 'related_to':
-            edashd.append((u, v))
-        else:
-            esolid.append((u, v))
-    g_edges1 = hvnx.draw_networkx_edges(G, pos, edgelist=esolid, edge_width=4 if len(edashd)>0 else 1, alpha=0.7, style='solid')  # increase width when mixed with dashed
-    g_edges2 = hvnx.draw_networkx_edges(G, pos, edgelist=edashd, edge_width=1, alpha=0.7, style='dashed')
-    return g_nodes * g_edges1 * g_edges2
-
-
-# In[ ]:
-
-
-# test
-#aids = ['https://openalex.org/A5028049278']
-#anames = ['Ruben Lacroix']
-#edges, labels = coauthor_net(fetch_works(aids, ['authorships']), aids, anames)
-
-
-# In[ ]:
-
-
-#extract_affiliations(edges, aids)
-
-
-# In[ ]:
-
-
-#pn.panel(network_widget(edges, labels), width=800, height=800).servable()
-#pn.panel(network_widget([]), width=800, height=800).servable()
+    # create sub graphs
+    if not coauthors.empty:
+        hvplots = {}
+        for year in years:
+            nodes = hvnx.draw_networkx_nodes(G, pos)  #  labels=names
+            edges = hvnx.draw_networkx_edges(G, pos)  # , alpha=dim(year)/max_cs
+            graph = nodes * edges
+            tooltips = [('name', '@name')]  # doesn't work for numeric keys, e.g. year number
+            hover = HoverTool(tooltips=tooltips)
+            hvplots[int(year)] = graph.opts(opts.Graph(
+                                                       tools=[hover, 'tap'],  # https://docs.bokeh.org/en/2.4.1/docs/user_guide/tools.html
+                                                       node_fill_alpha='y'+year, node_line_alpha=0.3,
+                                                       edge_alpha='y'+year,
+                                                       edge_line_width=1,
+                                                       node_color='type', cmap=['blue', 'green'],
+                                                       #edge_hover_line_color='yellow', node_hover_fill_color='yellow'
+                                                      )
+                                           )
+    else:
+        hvplots = {1984: hvnx.draw_networkx(G, pos)}
+        
+    # create HoloMap
+    hm = HoloMap(hvplots, kdims='Year')
+    return Dynamic(hm)
 
 
 # ## Components 
@@ -255,43 +318,53 @@ candidates = pn.widgets.Tabulator(pn.bind(suggest_authors, autocomplete.param.va
 # button to trigger co-author search
 start_button = pn.widgets.Button(name='Create network', button_type='primary')
 
-# list to persist fetched works
-works_pane = pn.pane.JSON('[]')
-author_ids_pane = pn.pane.JSON('[]')
+# list to persist fetched works and author data
+data_cache = pn.widgets.JSONEditor(value={})
+author_ids_cache = pn.pane.JSON('[]')  # just used for selection check
 
 # network widget
-coauthors = pn.panel(network_widget(pd.DataFrame()),  # init sample graph
-                     #width=800, height=800
-                     sizing_mode='stretch_both'
-                    )
+network_widget = pn.bind(make_network_widget, data_cache)    
 
 # affiliations-only checkbox
-cb_aff = pn.widgets.Checkbox(name='Affiliations only')
+#cb_aff = pn.widgets.Checkbox(name='Affiliations only')
 
 def process_selection(event):
     selection = candidates.value.iloc[candidates.selection]
     works = []
-    # fetch works only if selection is different
-    author_ids = json.loads(author_ids_pane.object)
+    author_ids = json.loads(author_ids_cache.object)
     if not selection.empty:
+        # fetch works only if selection is different
         if set(selection.id.to_list()) != set(author_ids):
             author_ids = selection.id.to_list()
-            author_ids_pane.object = json.dumps(author_ids)
-            works = fetch_works(author_ids, ['authorships'])
-            works_pane.object = json.dumps(works)
+            works = fetch_works(author_ids, ['id', 'publication_year', 'authorships'])
+            # replace cache
+            author_ids_cache.object = json.dumps(author_ids)
+            data_cache.value = {'works': works, 'author_ids': author_ids, 'author_name': selection.display_name.to_list()[0]}
         else:
-            works = json.loads(works_pane.object)
-    if len(works) > 0:
-        # create network
-        edges, labels = coauthor_net(works, author_ids, selection.display_name.to_list()[0])
-        # show affiliations only?
-        if cb_aff.value:
-            edges = extract_affiliations(edges, author_ids)
-    else:
-        edges = pd.DataFrame(); labels = None
-    coauthors.object = network_widget(edges, labels)
+            pass
     
 start_button.on_click(process_selection);
+
+
+# In[ ]:
+
+
+explanation = pn.pane.Markdown(
+"""
+## How to use this interactive network
+
+Nodes represent either coauthors (including the target author) or affiliated institutes.
+Hover over nodes to see the name of the author or institute.
+Click on a node to highlight its affiliations only.
+
+
+## How to interpret the network
+
+Initially, no connections are shown - by moving the year slider, more and more connections appear; 
+the strength of the connection corresponds to the relative number of works published by an author under an affiliated institute.
+Node strength, on the other hand, corresponds to the relative number of works coauthored with the target author. 
+"""
+        )
 
 
 # In[ ]:
@@ -305,18 +378,37 @@ template.sidebar.append(
             autocomplete, 
             start_button,
             candidates,
-            cb_aff
+            explanation
         )
 )
 template.main.append(
-    pn.Row( 
-        coauthors,
-        #sizing_mode='stretch_both'  # -> caused issues with toggling in tabulator
+    pn.Column(
+        pn.Row(
+            pn.panel(network_widget, widget_location='right_top', width=500, height=500),
+        )
     )
 )
 
 # make page servable
 template.servable();  # ; to prevent inline output / use preview instead
+
+
+# ## Dev
+
+# In[ ]:
+
+
+# # for dev: retrieve works of known author
+# aids = ['https://openalex.org/A5050656020']  # https://openalex.org/A5076642362
+# works = fetch_works(aids, ['id', 'publication_year', 'authorships'])
+# coauthors, affiliations, years = process_works(works, aids, 'test_name')
+# hm = make_network_widget({'works': works, 'author_ids': aids, 'author_name': 'test_name'})
+
+
+# In[ ]:
+
+
+# pn.panel(hm, sizing_mode = 'stretch_both')[1].servable()
 
 
 # In[ ]:
