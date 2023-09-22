@@ -1,9 +1,14 @@
 # Open RI tools: discover the impact of your research
 
-All apps are created with [Panel](https://panel.holoviz.org/). 
-They are static websites running entirely in your browser by leveraging [Pyodide](https://pyodide.org/en/stable/).
+All applications are created with [Panel](https://panel.holoviz.org/) and other tools within the [HoloViz](https://holoviz.org/) ecosystem.
 
-We use a technology called Progressive Web Apps which allows you to install each application on your computer, e.g. follow the instructions for [Chrome](https://support.google.com/chrome/answer/9658361).
+There are two ways to run the applications in your browser
+- as static [websites](https://ubvu.github.io/open-ri-tools/); this deployment uses [Pyodide](https://pyodide.org/en/stable/)
+- as a web application running on mybinder:
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ubvu/open-ri-tools/mybinder?urlpath=/panel/)
+
+For the static websites, we use a technology called Progressive Web Apps which allows you to install each application on your computer, e.g. follow the instructions for [Chrome](https://support.google.com/chrome/answer/9658361).
 
 ## Contribution: development workflow
 
