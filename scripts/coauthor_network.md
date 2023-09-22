@@ -148,18 +148,18 @@ def institutes_cumsum(df, years):
 
 ```python
 def make_graph(coauthors, affiliations, years, author_ids, author_name):
-
-    affiliations, institutes = institutes_cumsum(affiliations, years)
     
     # prepare edges (affiliations)
     # add year:cumsum as attributes
+    affiliations, institutes = institutes_cumsum(affiliations, years)
+     # scale cumsum to alpha (by author, indicating affiliation strength)
+    affiliations['cumsum'] = (affiliations['cumsum'] / affiliations.groupby('aid')['cumsum'].transform(max))
     # NOTE holoviews dimensions don't work well with numeric attributes e.g. 2010 (or '2010')
     # add a prefix to prevent errors
     affiliations['year'] = 'y' + affiliations.year.astype(str)
     # from_pandas_edgelist requires wide format for attributes
     affiliations = affiliations.pivot(index=['aid', 'iid'], columns='year', values='cumsum')
     affiliations = affiliations.reset_index()
-    # TODO: scale cumsum to alpha
     # create graph
     G = nx.from_pandas_edgelist(affiliations, 'aid', 'iid', edge_attr=True)
     
@@ -181,7 +181,7 @@ def make_graph(coauthors, affiliations, years, author_ids, author_name):
     # node-attributes format: {id:{attr: a}}
     node_attributes = nodes.pivot(index=['id'], columns='year', values='cumsum').to_dict('index')
     # add name and type (author/institute)
-    extra_attributes = nodes[['id', 'name', 'type']].drop_duplicates().set_index('id').to_dict('index')
+    extra_attributes = nodes[['id', 'name', 'type']].drop_duplicates(['id']).set_index('id').to_dict('index')
     for node in node_attributes:
         node_attributes[node]['name'] = extra_attributes[node]['name']
         node_attributes[node]['type'] = extra_attributes[node]['type']
@@ -222,15 +222,17 @@ def make_network_widget(data_cache):
             graph = nodes * edges
             tooltips = [('name', '@name')]  # doesn't work for numeric keys, e.g. year number
             hover = HoverTool(tooltips=tooltips)
-            hvplots[int(year)] = graph.opts(opts.Graph(inspection_policy='nodes', tools=[hover], 
-                                                       node_fill_alpha='y'+year, 
-                                                       edge_alpha='y'+year,  # TODO not scaled yet
+            hvplots[int(year)] = graph.opts(opts.Graph(
+                                                       tools=[hover, 'tap'],  # https://docs.bokeh.org/en/2.4.1/docs/user_guide/tools.html
+                                                       node_fill_alpha='y'+year, node_line_alpha=0.3,
+                                                       edge_alpha='y'+year,
                                                        edge_line_width=1,
-                                                       node_color='type', cmap=['blue', 'green']
+                                                       node_color='type', cmap=['blue', 'green'],
+                                                       #edge_hover_line_color='yellow', node_hover_fill_color='yellow'
                                                       )
                                            )
     else:
-        hvplots = {1: hvnx.draw_networkx(G, pos)}
+        hvplots = {1984: hvnx.draw_networkx(G, pos)}
         
     # create HoloMap
     hm = HoloMap(hvplots, kdims='Year')
@@ -266,8 +268,7 @@ data_cache = pn.widgets.JSONEditor(value={})
 author_ids_cache = pn.pane.JSON('[]')  # just used for selection check
 
 # network widget
-network_widget = pn.bind(make_network_widget, data_cache)
-network_pane = pn.panel(network_widget, center=True, widget_location='top')    
+network_widget = pn.bind(make_network_widget, data_cache)    
 
 # affiliations-only checkbox
 #cb_aff = pn.widgets.Checkbox(name='Affiliations only')
@@ -291,6 +292,25 @@ start_button.on_click(process_selection);
 ```
 
 ```python
+explanation = pn.pane.Markdown(
+"""
+## How to use this interactive network
+
+Nodes represent either coauthors (including the target author) or affiliated institutes.
+Hover over nodes to see the name of the author or institute.
+Click on a node to highlight its affiliations only.
+
+
+## How to interpret the network
+
+Initially, no connections are shown - by moving the year slider, more and more connections appear; 
+the strength of the connection corresponds to the relative number of works published by an author under an affiliated institute.
+Node strength, on the other hand, corresponds to the relative number of works coauthored with the target author. 
+"""
+        )
+```
+
+```python
 template = pn.template.BootstrapTemplate(
     title='What is my coauthor network?'
 )
@@ -299,12 +319,14 @@ template.sidebar.append(
             autocomplete, 
             start_button,
             candidates,
-            #cb_aff,
+            explanation
         )
 )
 template.main.append(
-    pn.Row(
-        network_pane
+    pn.Column(
+        pn.Row(
+            pn.panel(network_widget, widget_location='right_top', width=500, height=500),
+        )
     )
 )
 
@@ -316,17 +338,14 @@ template.servable();  # ; to prevent inline output / use preview instead
 
 ```python
 # # for dev: retrieve works of known author
-# aids = ['https://openalex.org/A5076642362']  # https://openalex.org/A5028049278
+# aids = ['https://openalex.org/A5050656020']  # https://openalex.org/A5076642362
 # works = fetch_works(aids, ['id', 'publication_year', 'authorships'])
 # coauthors, affiliations, years = process_works(works, aids, 'test_name')
-```
-
-```python
 # hm = make_network_widget({'works': works, 'author_ids': aids, 'author_name': 'test_name'})
 ```
 
 ```python
-# hm
+# pn.panel(hm, sizing_mode = 'stretch_both')[1].servable()
 ```
 
 ```python
