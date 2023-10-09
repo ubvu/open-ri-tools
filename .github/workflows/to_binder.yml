@@ -1,0 +1,35 @@
+name: convert-to-binder-format
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Packages
+        run: |
+          pip install jupytext==1.14.7
+      - name: Convert
+        run: |
+          jupytext --sync scripts/*
+      - name: Move
+        run: |
+          mkdir mybinder
+          cp -r notebooks/* mybinder
+          cp environment-binder.yml mybinder/environment.yml
+      - name: Deploy
+        uses: s0/git-publish-subdir-action@develop
+        env:
+          REPO: self
+          BRANCH: mybinder
+          FOLDER: mybinder
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

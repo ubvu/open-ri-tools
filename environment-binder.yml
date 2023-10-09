@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jupyter-panel-proxy
+  - pyviz::panel=1.2.1
+  - pyviz::hvplot=0.8.4
+  - plotly=5.15.0
+  - pip:
+    - pyalex==0.11
+    - networkx[default]==3.1
