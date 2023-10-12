@@ -26,6 +26,8 @@ jobs:
           mkdir mybinder
           cp -r notebooks/* mybinder
           cp environment-binder.yml mybinder/environment.yml
+          cp requirements.txt mybinder/requirements.txt
+          cp Procfile mybinder/Procfile
       - name: Deploy
         uses: s0/git-publish-subdir-action@develop
         env:
