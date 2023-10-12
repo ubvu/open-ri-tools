@@ -1,3 +1,6 @@
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+
 # Open RI tools: discover the impact of your research
 
 All applications are created with [Panel](https://panel.holoviz.org/) and other tools within the [HoloViz](https://holoviz.org/) ecosystem.
