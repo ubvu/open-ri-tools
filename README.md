@@ -10,15 +10,25 @@ We use open databases such as [OpenAlex](https://openalex.org/) to offer an alte
 
 ## Try it out yourself!
 
-All applications are created with [Panel](https://panel.holoviz.org/) and other tools within the [HoloViz](https://holoviz.org/) ecosystem.
+All tools are created with [Panel](https://panel.holoviz.org/) and other tools within the [HoloViz](https://holoviz.org/) ecosystem.
 
-There are two ways to run the applications in your browser
-- as static [websites](https://ubvu.github.io/open-ri-tools/); this deployment uses [Pyodide](https://pyodide.org/en/stable/)
-- as a web application running on mybinder:
+There are two ways to run the tools in your browser:
+- as static websites; this deployment uses [Pyodide](https://pyodide.org/en/stable/)
+- as hosted web applications (limited availability)
 
+Follow the links in the table below, not all applications are currently available:
+
+| Tool | Website | Application |
+| -------- | ------- | ------- |
+| Citations in clinical trials | [Yes](https://ubvu.github.io/open-ri-tools/clinical_trials.html) | [Yes](https://open-ri-tools-42fcc89e2d28.herokuapp.com/) |
+| Collaboration with global south | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) | [Yes](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) |
+| Coauthor network | [Yes](https://ubvu.github.io/open-ri-tools/coauthor_network.html) | No |
+
+<!--
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ubvu/open-ri-tools/mybinder?urlpath=/panel/)
+-->
 
-For the static websites, we use a technology called Progressive Web Apps which allows you to install each application on your computer, e.g. follow the instructions for [Chrome](https://support.google.com/chrome/answer/9658361).
+For the static websites, we use Progressive Web Apps which allows you to install each application on your computer, e.g. follow the instructions for [Chrome](https://support.google.com/chrome/answer/9658361).
 
 ## Contribute
 
