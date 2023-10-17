@@ -14,4 +14,4 @@ while read line; do
 	# push to heroku
 	giturl=$(echo "https://git.heroku.com/${appname}.git") 
 	git push $giturl heroku:main
-done
+done < deployments
