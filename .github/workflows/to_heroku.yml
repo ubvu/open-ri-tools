@@ -23,19 +23,20 @@ jobs:
           jupytext --sync scripts/*
       - name: Move
         run: |
-          mkdir heroku
-          cp -r notebooks/* heroku
-          cp requirements.txt heroku/requirements.txt
-          cp runtime.txt heroku/runtime.txt
-          cp publish.sh heroku/publish.sh
-          while read line; do
-	   appnameF=$(echo $line | cut -f 1 -d ',')
-	   appnameH=$(echo "`echo $line | cut -f 2 -d ','`-`echo $line | cut -f 3 -d ','`")
-	   # create profile and add to respective folder
-           mkdir heroku/procfiles
-           mkdir heroku/procfiles/$appnameH
-           echo "web: panel serve --address=\"0.0.0.0\" --port=\$PORT ${appnameF}.ipynb --allow-websocket-origin=${appnameH}.herokuapp.com" > heroku/procfiles/$appnameH/Procfile
-          done
+                mkdir heroku
+                cp -r notebooks/* heroku
+                cp requirements.txt heroku/requirements.txt
+                cp runtime.txt heroku/runtime.txt
+                cp deployments heroku/deployments
+                cp publish.sh heroku/publish.sh
+                while read line; do
+                        appnameF=$(echo $line | cut -f 1 -d ',')
+                        appnameH=$(echo "`echo $line | cut -f 2 -d ','`-`echo $line | cut -f 3 -d ','`")
+                        # create profile and add to respective folder
+                        mkdir heroku/procfiles
+                        mkdir heroku/procfiles/$appnameH
+                        echo "web: panel serve --address=\"0.0.0.0\" --port=\$PORT ${appnameF}.ipynb --allow-websocket-origin=${appnameH}.herokuapp.com" > heroku/procfiles/$appnameH/Procfile
+                done < deployments
       - name: Deploy
         uses: s0/git-publish-subdir-action@develop
         env:
