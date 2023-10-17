@@ -1,0 +1,44 @@
+name: convert-to-heroku-format
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Packages
+        run: |
+          pip install jupytext==1.14.7
+      - name: Convert
+        run: |
+          jupytext --sync scripts/*
+      - name: Move
+        run: |
+          mkdir heroku
+          cp -r notebooks/* heroku
+          cp requirements.txt heroku/requirements.txt
+          cp runtime.txt heroku/runtime.txt
+          cp publish.sh heroku/publish.sh
+          while read line; do
+	         appnameF=$(echo $line | cut -f 1 -d ',')
+ 	         appnameH=$(echo $line | cut -f 2 -d ',')
+	         # create procfile and add to respective folder
+	         mkdir heroku/procfiles/$appnameH
+	         echo "web: panel serve --address="0.0.0.0" --port=$PORT ${appnameF}.ipynb --allow-websocket-origin=${appurl}" > heroku/procfiles/$appnameH/Procfile
+	        done
+      - name: Deploy
+        uses: s0/git-publish-subdir-action@develop
+        env:
+          REPO: self
+          BRANCH: heroku
+          FOLDER: heroku
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
