@@ -1,0 +1,1 @@
+web: panel serve --address="0.0.0.0" --port=$PORT global_south.ipynb --allow-websocket-origin=open-ri-tools2-8ff4ed866ade.herokuapp.com
