@@ -11,9 +11,7 @@ while read line; do
  	heroku buildpacks:add -a $appname heroku-community/multi-procfile
 	# reference procfile location
  	heroku config:set -a $appname PROCFILE=procfiles/$appname-${appcode}/Procfile
-	# reset repo
- 	heroku repo:reset -a $appname
- 	# push to heroku
+	# push to heroku
 	giturl=$(echo "https://git.heroku.com/${appname}.git") 
 	git push $giturl heroku:main
 done < deployments
