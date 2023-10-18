@@ -29,6 +29,13 @@ pn.extension('plotly', 'tabulator')
 - Functions for data collection and transformation
 
 ```python
+def process_doi(doi):
+    # api allows url or plain doi
+    # but no trailing whitespaces
+    return doi.strip()
+```
+
+```python
 # retrieve citing publications from openalex
 def get_citing(doi):
     
@@ -207,7 +214,7 @@ def update_data(doi=None):
         yield ''  # show nothing when initializing
     else:
         yield 'Search in progress...'
-        df = get_data(doi)
+        df = get_data(process_doi(doi))
         if df.empty:
             yield 'Invalid DOI or no data available'  
         else:
