@@ -346,12 +346,16 @@ def process_selection(event):
 start_button.on_click(process_selection);
 
 
+# ## Description
+
 # In[ ]:
 
 
-explanation = pn.pane.Markdown(
+description = pn.pane.Markdown(
 """
-## How to use this interactive network
+(Data is fetched from [OpenAlex](https://openalex.org/))
+
+## How to use this network
 
 Nodes represent either coauthors (including the target author) or affiliated institutes.
 Hover over nodes to see the name of the author or institute.
@@ -364,21 +368,24 @@ Initially, no connections are shown - by moving the year slider, more and more c
 the strength of the connection corresponds to the relative number of works published by an author under an affiliated institute.
 Node strength, on the other hand, corresponds to the relative number of works coauthored with the target author. 
 """
-        )
+)
 
+
+# ## Layout
 
 # In[ ]:
 
 
 template = pn.template.BootstrapTemplate(
-    title='What is my coauthor network?'
+    title='What is my coauthor network?',
+    busy_indicator=pn.indicators.LoadingSpinner(size=40, value=True, color='primary', bgcolor='light')
 )
 template.sidebar.append(
     pn.Column(
             autocomplete, 
             start_button,
             candidates,
-            explanation
+            description
         )
 )
 template.main.append(

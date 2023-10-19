@@ -1,5 +1,5 @@
 const appName = 'Open RI'
-const appCacheName = 'Open RI-f624e9366dc34503aa197fc77731307e';
+const appCacheName = 'Open RI-2d720d69e3864dfbb5b462318df9d2b1';
 
 const preCacheFiles = ['images/favicon.ico', 'images/icon-vector.svg', 'images/icon-32x32.png', 'images/icon-192x192.png', 'images/icon-512x512.png', 'images/apple-touch-icon.png', 'images/index_background.png'];
 

@@ -69,6 +69,15 @@ pn.extension('plotly', 'tabulator')
 # In[ ]:
 
 
+def process_doi(doi):
+    # api allows url or plain doi
+    # but no trailing whitespaces
+    return doi.strip()
+
+
+# In[ ]:
+
+
 # retrieve citing publications from openalex
 def get_citing(doi):
     
@@ -187,6 +196,7 @@ def plot_citations(df):
     fig = px.bar(agg, x="year", y="title", color='is_trial',
                  labels={'title': 'Citations', 'year': 'Year'},
                  template="simple_white")
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02))
     fig.update_xaxes(type='category')  # otherwise, ticks appear when zooming in
     return fig
 
@@ -273,7 +283,7 @@ def update_data(doi=None):
         yield ''  # show nothing when initializing
     else:
         yield 'Search in progress...'
-        df = get_data(doi)
+        df = get_data(process_doi(doi))
         if df.empty:
             yield 'Invalid DOI or no data available'  
         else:
@@ -298,6 +308,21 @@ status_text = pn.bind(update_data, tb_doi)
 #     return pn.pane.DataFrame(dff, index=False, render_links=True, sizing_mode="stretch_both")
 
 
+# ## Description
+
+# In[ ]:
+
+
+description = pn.pane.Markdown(
+"""
+## Data sources
+Given a DOI, citing publications are fetched from [OpenAlex](https://openalex.org/).
+
+Publications are then classified as clinical trials using [PubMed](https://pubmed.ncbi.nlm.nih.gov/).
+"""
+)
+
+
 # ## Layout
 # 
 # - add components to page
@@ -306,14 +331,16 @@ status_text = pn.bind(update_data, tb_doi)
 
 
 template = pn.template.BootstrapTemplate(
-    title='Is my research used in clinical trials?'
+    title='Is my research used in clinical trials?',
+    busy_indicator=pn.indicators.LoadingSpinner(size=40, value=True, color='primary', bgcolor='light')
 )
 template.main.append(
     pn.Row(
         pn.Column(
             tb_doi,
             status_text,
-            pane_plot_citations
+            pane_plot_citations,
+            description
         ),
         pn.Column(
             pn.Row(cb_trial, slider_year),
