@@ -149,11 +149,30 @@ plot_obj = pn.bind(plot_graph, df_cache)  # updated when df changes
 plot_pane = pn.pane.Plotly(plot_obj, config={"responsive": False})
 ```
 
+## Description
+
+```python
+description = pn.pane.Markdown(
+"""
+
+
+## Explanation
+Using [OpenAlex](https://openalex.org/), we fetch a given institution's publication counts for the last 10 years.
+
+Counts are fetched for publications with 0 or >=1 coauthors from the global south and the ratio is shown (*local*).
+
+We also show the global ratio for comparison.
+Countries are classified as global south based on [UN definitions](https://docs.openalex.org/api-entities/geo/regions#global-south).
+"""
+)
+```
+
 ## Layout
 
 ```python
 template = pn.template.BootstrapTemplate(
-    title='Does my institute collaborate with the global south?'
+    title='Does my institute collaborate with the global south?',
+    busy_indicator=pn.indicators.LoadingSpinner(size=40, value=True, color='primary', bgcolor='light')
 )
 template.sidebar.append(
     pn.Column(
@@ -163,7 +182,7 @@ template.sidebar.append(
         )
 )
 template.main.append(
-    pn.Column(plot_pane)
+    pn.Column(plot_pane, description)
 )
 template.servable();
 ```
