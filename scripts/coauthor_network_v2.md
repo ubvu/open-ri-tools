@@ -219,9 +219,12 @@ def plot_concepts(df):
             orientation='h'))
     else:
         fig = go.Figure()
-    fig.update_layout(yaxis=dict(autorange="reversed"))
-    fig.update_layout(template='simple_white', title='What is their research about?')
-    fig.update_xaxes(title_text="# Works")
+    fig.update_layout(
+        template='simple_white', 
+        title='What is their research about?',
+        yaxis=dict(autorange="reversed", tickmode='linear'), 
+        xaxis=dict(title_text="# Works")
+    )
     return fig
 ```
 
