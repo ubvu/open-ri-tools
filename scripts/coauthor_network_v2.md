@@ -210,7 +210,7 @@ def make_network_widget(coauthors_from_cache):
 concepts / research fields
 
 ```python
-def plot_concepts(df):
+def plot_concepts(df, author_name):
     if not df.empty:
         df = df.sort_values(by=['count'], ascending=False).head(10)  # top10
         fig = go.Figure(go.Bar(
@@ -221,7 +221,7 @@ def plot_concepts(df):
         fig = go.Figure()
     fig.update_layout(
         template='simple_white', 
-        title='What is their research about?',
+        title=f"What is {author_name}'s research about?",
         yaxis=dict(autorange="reversed", tickmode='linear'), 
         xaxis=dict(title_text="# Works")
     )
@@ -263,33 +263,43 @@ start_button = pn.widgets.Button(name='Create network', button_type='primary')
 network_widget = pn.bind(make_network_widget, cache_coau)   
 
 # bar plot
-concepts_bar = pn.pane.Plotly(plot_concepts(pd.DataFrame()), config={"responsive": False}, sizing_mode='stretch_both')
+concepts_bar = pn.pane.Plotly(plot_concepts(pd.DataFrame(), 'no one'), config={"responsive": False}, sizing_mode='stretch_both')
 
-# coauthor ranking table, for selection -> populates bar plot
+# coauthor ranking table, for selection -> updates data
 table_widget = pn.widgets.Tabulator(cache_coau, # implicitly binds table to df
                                     titles={'name': 'Name', 'count': '# shared Works'},
                                     hidden_columns=['id'],
-                                    sorters=[{'field': 'count', 'dir': 'desc'}],
+                                    #sorters=[{'field': 'count', 'dir': 'desc'}],
                                     disabled=True, show_index=False,
                                     sizing_mode='stretch_height'
                                    )
-# triggered when coauthor is selected
-def get_concepts(event):
-    concepts = fetch_concepts(table_widget.value.loc[event.row, 'id'])
-    concepts_bar.object = plot_concepts(concepts)
-table_widget.on_click(get_concepts)
+
+# display current target author
+target_author = pn.pane.Markdown('')
 ```
 
+## Interactivity
+
 ```python
-# utility function so that we can populate visuals as well when the app starts
-def populate_data(author_ids, author_name):
+def update_data(author_ids, author_name):
     # fetch and process data, cache only after agg
     coauthors, affiliations, institutes = fetch_process_agg(author_ids, author_name)
-    # replace cache
+    concepts = fetch_concepts(author_ids[0])
+    # replace cache, automatically updates visuals
     cache_auth.value = {'author_ids': author_ids, 'author_name': author_name}
     cache_affi.value = affiliations
     cache_inst.value = institutes
     cache_coau.value = coauthors.sort_values(by=['count'], ascending=False)  # should be last as this triggers the bind; sort for table
+    concepts_bar.object = plot_concepts(concepts, author_name)
+    target_author.object = f'## {author_name}'
+```
+
+```python
+# triggered when coauthor is selected
+def update_target_author(event):
+    update_data([table_widget.value.iloc[event.row]['id']], table_widget.value.iloc[event.row]['name'])
+    table_widget.selection = []  # reset selection
+table_widget.on_click(update_target_author)
 ```
 
 ```python
@@ -302,7 +312,7 @@ def process_selection(event):
         if set(selection.id.to_list()) != set(author_ids):
             author_ids = selection.id.to_list()
             author_name = selection.display_name.to_list()[0]
-            populate_data(author_ids, author_name)
+            update_data(author_ids, author_name)
         else:
             pass
     
@@ -345,10 +355,14 @@ template.sidebar.append(
 
 template.main.append(
     pn.Row(
-        pn.Column(pn.pane.Markdown('## Top Coauthors\n Select to show research fields below'), table_widget, concepts_bar),
+        pn.Column(pn.pane.Markdown('## Top Coauthors'), 
+                  pn.Row(table_widget, 
+                         pn.Column(pn.pane.Markdown('## Showing network for'), target_author, pn.pane.Markdown('### &#8592; Select for drill-down'),
+                                   styles=dict(background='whitesmoke'))), 
+                  concepts_bar),
         pn.Column(
             pn.Row(
-                pn.panel(network_widget, widget_location='right_top', width=500, height=500),
+                pn.panel(network_widget, width=500, height=500),
             ),
             description,
             sizing_mode="stretch_both",
@@ -363,9 +377,13 @@ template.servable();  # ; to prevent inline output / use preview instead
 ## At start-up, load demo data
 
 ```python
-populate_data(['https://openalex.org/A5067720298'], 'Claude E. Shannon')
+update_data(['https://openalex.org/A5067720298'], 'Claude E. Shannon')
 ```
 
 ```python
 #pn.panel(network_widget)
+```
+
+```python
+
 ```
