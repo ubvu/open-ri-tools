@@ -1,0 +1,1 @@
+web: panel serve --address="0.0.0.0" --port=$PORT coauthor_network_v2.ipynb --allow-websocket-origin=open-ri-tools3-39de28a0be8f.herokuapp.com
