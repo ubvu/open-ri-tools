@@ -39,6 +39,10 @@ Difference to v1
 - works are not cached (caused memory overflow)
 - only one network is created at a time (no year slider)
 
+New features
+- research fields
+- networks of coauthors
+
 
 ## Backend
 
@@ -265,13 +269,21 @@ network_widget = pn.bind(make_network_widget, cache_coau)
 # bar plot
 concepts_bar = pn.pane.Plotly(plot_concepts(pd.DataFrame(), 'no one'), config={"responsive": False}, sizing_mode='stretch_both')
 
-# coauthor ranking table, for selection -> updates data
-table_widget = pn.widgets.Tabulator(cache_coau, # implicitly binds table to df
-                                    titles={'name': 'Name', 'count': '# shared Works'},
+# coauthors table, for selection
+table_widget = pn.widgets.Tabulator(pd.DataFrame(),
+                                    titles={'name': 'Name', 'count': '#'},
                                     hidden_columns=['id'],
                                     #sorters=[{'field': 'count', 'dir': 'desc'}],
                                     disabled=True, show_index=False,
-                                    sizing_mode='stretch_height'
+                                    sizing_mode='stretch_both'
+                                   )
+
+# 2nd degree coauthors table
+table_widget2 = pn.widgets.Tabulator(pd.DataFrame(),
+                                    titles={'name': 'Name', 'count': '#'},
+                                    hidden_columns=['id'],
+                                    disabled=True, show_index=False,
+                                    sizing_mode='stretch_both'
                                    )
 
 # display current target author
@@ -281,6 +293,7 @@ target_author = pn.pane.Markdown('')
 ## Interactivity
 
 ```python
+# when triggered, updates non-table visuals
 def update_data(author_ids, author_name):
     # fetch and process data, cache only after agg
     coauthors, affiliations, institutes = fetch_process_agg(author_ids, author_name)
@@ -291,18 +304,27 @@ def update_data(author_ids, author_name):
     cache_inst.value = institutes
     cache_coau.value = coauthors.sort_values(by=['count'], ascending=False)  # should be last as this triggers the bind; sort for table
     concepts_bar.object = plot_concepts(concepts, author_name)
-    target_author.object = f'## {author_name}'
+    target_author.object = f'### {author_name}'
 ```
 
 ```python
-# triggered when coauthor is selected
-def update_target_author(event):
+# triggered when coauthor is selected in table
+
+# table 1
+def update_data_and_table2(event):
     update_data([table_widget.value.iloc[event.row]['id']], table_widget.value.iloc[event.row]['name'])
-    table_widget.selection = []  # reset selection
-table_widget.on_click(update_target_author)
+    table_widget2.value = cache_coau.value
+table_widget.on_click(update_data_and_table2)
+
+# table 2
+def update_data_only(event):
+    update_data([table_widget2.value.iloc[event.row]['id']], table_widget2.value.iloc[event.row]['name'])
+table_widget2.on_click(update_data_only)
 ```
 
 ```python
+# update data when create-network-button is pressed
+
 author_ids_cache = pn.pane.JSON('[]')  # just used for selection check
 def process_selection(event):
     selection = candidates.value.iloc[candidates.selection]
@@ -313,6 +335,13 @@ def process_selection(event):
             author_ids = selection.id.to_list()
             author_name = selection.display_name.to_list()[0]
             update_data(author_ids, author_name)
+            # update table1
+            table_widget.value = pd.DataFrame()  # resets scrollbar
+            table_widget.value = cache_coau.value
+            # reset selection
+            table_widget.selection = []
+            # remove table2
+            table_widget2.value = pd.DataFrame()
         else:
             pass
     
@@ -355,11 +384,21 @@ template.sidebar.append(
 
 template.main.append(
     pn.Row(
-        pn.Column(pn.pane.Markdown('## Top Coauthors'), 
-                  pn.Row(table_widget, 
-                         pn.Column(pn.pane.Markdown('## Showing network for'), target_author, pn.pane.Markdown('### &#8592; Select for drill-down'),
-                                   styles=dict(background='whitesmoke'))), 
-                  concepts_bar),
+        pn.Column(
+            pn.Row(pn.pane.Markdown('### Network for'), target_author, styles=dict(background='whitesmoke')),
+            pn.Row(pn.pane.Markdown('#### Select coauthor below to update data')),
+            pn.Row(
+                pn.Column(
+                    pn.pane.Markdown('First degree'), 
+                    table_widget
+                ),
+                pn.Column(
+                    pn.pane.Markdown('Second degree'),
+                    table_widget2
+                )
+            ),
+            concepts_bar
+        ),
         pn.Column(
             pn.Row(
                 pn.panel(network_widget, width=500, height=500),
@@ -378,6 +417,7 @@ template.servable();  # ; to prevent inline output / use preview instead
 
 ```python
 update_data(['https://openalex.org/A5067720298'], 'Claude E. Shannon')
+table_widget.value = cache_coau.value
 ```
 
 ```python
