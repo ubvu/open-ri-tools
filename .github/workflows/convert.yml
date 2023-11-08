@@ -26,7 +26,10 @@ jobs:
       - name: Convert
         run: |
           jupytext --sync scripts/*
-          panel convert notebooks/*.ipynb --to pyodide-worker --out docs --index --title "Open RI" --pwa
+          while read line; do
+                  appname=$(echo $line | cut -f 1 -d ',')
+                  panel convert notebooks/$appname.ipynb --to pyodide-worker --out docs --pwa
+          done < website_apps
       - name: Deploy
         uses: s0/git-publish-subdir-action@develop
         env:
