@@ -20,11 +20,11 @@ Before using the applications, read our [disclaimer](#disclaimer).
 
 Then follow the links in the table below, not all applications are currently available:
 
-| Tool | Website | Application |
+| Tool | Application | Website |
 | -------- | ------- | ------- |
-| Citations in clinical trials | [Yes](https://ubvu.github.io/open-ri-tools/clinical_trials.html) | [Yes](https://open-ri-tools-42fcc89e2d28.herokuapp.com/) |
-| Collaboration with global south | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) | [Yes](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) |
-| Coauthor network | [Yes](https://ubvu.github.io/open-ri-tools/coauthor_network.html) | No |
+| Citations in clinical trials | [Yes](https://open-ri-tools-42fcc89e2d28.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/clinical_trials.html) |
+| Collaboration with global south | [Yes](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) |
+| Coauthor network | [Yes](https://open-ri-tools3-39de28a0be8f.herokuapp.com/) | No |
 
 <!--
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ubvu/open-ri-tools/mybinder?urlpath=/panel/)
