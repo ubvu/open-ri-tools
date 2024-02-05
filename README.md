@@ -22,9 +22,9 @@ Then follow the links in the table below, not all applications are currently ava
 
 | Tool | Application | Website |
 | -------- | ------- | ------- |
-| Citations in clinical trials | [Yes](https://open-ri-tools-42fcc89e2d28.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/clinical_trials.html) |
-| Collaboration with global south | [Yes](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) |
-| Coauthor network | [Yes](https://open-ri-tools3-39de28a0be8f.herokuapp.com/) | No |
+| Citations in clinical trials | [No](https://open-ri-tools-42fcc89e2d28.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/clinical_trials.html) |
+| Collaboration with global south | [No](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) |
+| Coauthor network | [No](https://open-ri-tools3-39de28a0be8f.herokuapp.com/) | No |
 
 <!--
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ubvu/open-ri-tools/mybinder?urlpath=/panel/)
@@ -51,7 +51,7 @@ Websites
 - this deployment uses [Pyodide](https://pyodide.org/en/stable/)
 - be patient: every time an app/page is loaded, Python and all dependencies are fetched and installed 
 
-Hosted web applications
+Hosted web applications (currently not supported)
 - availability is limited: all applications share 1000 hours/month
 - eco: if an app hasn't been used in the last 30 mins, it goes to sleep and needs some time to start up
 - the server isn't able to handle many users simultaneously so it might occasionally slow down
