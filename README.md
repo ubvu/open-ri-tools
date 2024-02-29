@@ -26,6 +26,11 @@ Then follow the links in the table below, not all applications are currently ava
 | Collaboration with global south | [No](https://open-ri-tools2-8ff4ed866ade.herokuapp.com/) | [Yes](https://ubvu.github.io/open-ri-tools/global_south.html) |
 | Coauthor network | [No](https://open-ri-tools3-39de28a0be8f.herokuapp.com/) | No |
 
+The coauthor network tool is currently unavailable. 
+This is a demonstration of a search followed by an investigation of the network:
+
+<img src="resources/coauthor-network.gif" alt="coauthor network" width="600"/>
+
 <!--
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ubvu/open-ri-tools/mybinder?urlpath=/panel/)
 -->
